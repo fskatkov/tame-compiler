@@ -8,6 +8,8 @@
 #include <format>
 #include <ranges>
 #include <charconv>
+#include <cstddef>
+#include <utility>
 
 template<class... Ts>
 struct overloaded : Ts... {
@@ -28,3 +30,10 @@ static bool is_alpha(const char &symbol) {
 static bool is_alpha_numeric(const char &symbol) {
     return is_digit(symbol) || is_alpha(symbol);
 }
+
+struct SourceLocation {
+    std::size_t line{1};
+    std::size_t column{1};
+    std::size_t offset{0};
+    std::size_t length{1};
+};
