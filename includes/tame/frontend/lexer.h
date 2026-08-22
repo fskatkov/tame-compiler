@@ -20,12 +20,12 @@ namespace tame::frontend {
         char advance();
         [[nodiscard]] char peek() const;
         [[nodiscard]] char peek_next() const;
-        bool match(const char &expected_symbol);
+        bool match(const char &expected_symbol) const;
         [[nodiscard]] TokenType check(std::size_t starting, std::size_t ending, const std::string &rest, TokenType kind) const;
-        void add_token(const TokenType &token_type, const Value &token_literal);
-        void add_string_token();
-        void add_numeric_token();
-        void add_identifier_token();
+        void add_token(const TokenType &token_type, const Value &token_literal = NIL{});
+        void tokenize_string();
+        void tokenize_number();
+        void tokenize_identifier();
         [[nodiscard]] TokenType check_identifier() const;
     };
 }

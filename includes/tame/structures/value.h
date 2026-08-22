@@ -1,20 +1,6 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <variant>
-#include <sstream>
-#include <memory>
-#include <format>
-#include <ranges>
-
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+#include "tame/support/common.h"
 
 namespace tame::frontend {
     struct NIL {
@@ -108,7 +94,7 @@ namespace tame::frontend {
     using StringPtr = std::shared_ptr<std::string>;
 
     struct Value {
-        using ValueType = std::variant<std::size_t, int, float, StringPtr, TensorPtr, NIL>;
+        using ValueType = std::variant<int, float, StringPtr, TensorPtr, NIL>;
         ValueType value{NIL{}};
 
         Value() = default;
@@ -134,7 +120,6 @@ namespace tame::frontend {
 
     inline std::string Value::get_type() const {
         return std::visit(overloaded{
-            [](std::size_t) { return std::string("dim"); },
             [](int) { return std::string("i32"); },
             [](float) { return std::string("f32"); },
             [](StringPtr) { return std::string("str"); },
