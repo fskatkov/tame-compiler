@@ -13,9 +13,6 @@ int tame::DriverEngine::execute() {
         }
 
         diagnostic_engine.init(user_input);
-        frontend::Lexer lexer(user_input, diagnostic_engine);
-        const auto tokens = lexer.tokenize();
-        diagnostic_engine.raise_errors();
     }
 
     return 0;
