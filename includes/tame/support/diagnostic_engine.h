@@ -4,9 +4,7 @@
 
 namespace tame::diagnostics {
     struct DiagnosticReport {
-        enum class DiagnosticReportType {
-            WARNING, ERROR, FATAL
-        };
+        enum class DiagnosticReportType { ERROR, FATAL };
 
         DiagnosticReportType report_type;
         std::string report_message;

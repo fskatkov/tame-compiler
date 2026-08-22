@@ -2,16 +2,26 @@
 
 using namespace tame::frontend;
 
-Lexer::Lexer(std::string source) : source_str(std::move(source)) {
-}
+Lexer::Lexer(std::string source, diagnostics::DiagnosticEngine &diagnostic_engine)
+    : diagnostic_engine(diagnostic_engine), source_str(std::move(source)) {}
 
-std::vector<Token> Lexer::run() {
+std::vector<Token> Lexer::tokenize() {
     while (!is_reached_end()) {
         start_ptr = current_ptr;
+        start_line = line_counter;
+        start_column = column_counter;
         scan_next_token();
     }
 
-    tokens.emplace_back(TokenType::EOF_TOKEN, "");
+    tokens.emplace_back(
+        TokenType::EOF_TOKEN, "", NIL{},
+        SourceLocation{
+            .line = line_counter,
+            .column = column_counter,
+            .offset = current_ptr,
+            .length = 0
+        }
+    );
     return tokens;
 }
 
@@ -53,6 +63,9 @@ void Lexer::scan_next_token() {
                 tokenize_number();
             } else if (is_alpha(token)) {
                 tokenize_identifier();
+            } else [[unlikely]] {
+                report_error("unexpected character");
+                encountered_error = true;
             }
 
             break;
@@ -65,21 +78,32 @@ bool Lexer::is_reached_end() const {
 }
 
 char Lexer::advance() {
-    return source_str.at(current_ptr++);
+    const auto current_character = source_str.at(current_ptr++);
+
+    if (current_character == '\n') [[unlikely]] {
+        line_counter++;
+        column_counter = 1;
+    } else [[likely]] {
+        column_counter++;
+    }
+
+    return current_character;
 }
 
 char Lexer::peek() const {
-    if (is_reached_end()) return '\0';
+    if (is_reached_end()) [[unlikely]] return '\0';
     return source_str.at(current_ptr);
 }
 
 char Lexer::peek_next() const {
-    if (current_ptr + 1 >= source_str.length()) return '\0';
+    if (current_ptr + 1 >= source_str.length()) [[unlikely]] return '\0';
     return source_str.at(current_ptr + 1);
 }
 
-bool Lexer::match(const char &expected_symbol) const {
+bool Lexer::match(const char &expected_symbol) {
     if (is_reached_end() || source_str.at(current_ptr) != expected_symbol) return false;
+    current_ptr++;
+    column_counter++;
     return true;
 }
 
@@ -97,13 +121,25 @@ void Lexer::add_token(const TokenType &token_type, const Value &token_literal) {
     tokens.emplace_back(
         token_type,
         source_str.substr(start_ptr, current_ptr - start_ptr),
-        token_literal
+        token_literal,
+        SourceLocation{
+            .line = start_line,
+            .column = start_column,
+            .offset = start_ptr,
+            .length = current_ptr - start_ptr
+        }
     );
 }
 
 void Lexer::tokenize_string() {
     while (peek() != '\"' && !is_reached_end()) {
         advance();
+    }
+
+    if (is_reached_end()) [[unlikely]] {
+        report_error("unterminated string");
+        encountered_error = true;
+        return;
     }
 
     advance();
@@ -173,4 +209,17 @@ TokenType Lexer::check_identifier() const {
         case 'w': return check(1, 4, "hile", TokenType::WHILE_TOKEN);
         default: return TokenType::IDENTIFIER_TOKEN;
     }
+}
+
+void Lexer::report_error(const std::string &message) const {
+    diagnostic_engine.report(
+        diagnostics::DiagnosticReport::DiagnosticReportType::ERROR,
+        message,
+        SourceLocation{
+            .line = start_line,
+            .column = start_column,
+            .offset = start_ptr,
+            .length = current_ptr - start_ptr
+        }
+    );
 }

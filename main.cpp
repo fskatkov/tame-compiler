@@ -1,6 +1,5 @@
-#include <iostream>
+#include "tame/support/driver.h"
 
 int main() {
-    std::cout << "Hello, World!" << std::endl;
-    return 0;
+    return tame::DriverEngine::execute();
 }

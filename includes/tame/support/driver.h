@@ -1,8 +1,11 @@
-//
-// Created by Fedya Katkov on 8/22/26.
-//
+#pragma once
 
-#ifndef TAME_COMPILER_DRIVER_H
-#define TAME_COMPILER_DRIVER_H
+#include "diagnostic_engine.h"
+#include "tame/frontend/lexer.h"
 
-#endif //TAME_COMPILER_DRIVER_H
+namespace tame {
+    class DriverEngine {
+    public:
+        static int execute();
+    };
+}

@@ -1,17 +1,26 @@
 #pragma once
 
 #include "tame/structures/token.h"
+#include "tame/support/diagnostic_engine.h"
 
 namespace tame::frontend {
     class Lexer {
     public:
-        explicit Lexer(std::string source);
-        std::vector<Token> run();
+        explicit Lexer(std::string source, diagnostics::DiagnosticEngine &diagnostic_engine);
+        std::vector<Token> tokenize();
     private:
+        diagnostics::DiagnosticEngine &diagnostic_engine;
+
         std::string source_str;
 
         std::size_t start_ptr{0};
         std::size_t current_ptr{0};
+        std::size_t line_counter{1};
+        std::size_t start_line{1};
+        std::size_t column_counter{1};
+        std::size_t start_column{1};
+
+        bool encountered_error{false};
 
         std::vector<Token> tokens;
 
@@ -20,12 +29,13 @@ namespace tame::frontend {
         char advance();
         [[nodiscard]] char peek() const;
         [[nodiscard]] char peek_next() const;
-        bool match(const char &expected_symbol) const;
+        [[nodiscard]] bool match(const char &expected_symbol);
         [[nodiscard]] TokenType check(std::size_t starting, std::size_t ending, const std::string &rest, TokenType kind) const;
         void add_token(const TokenType &token_type, const Value &token_literal = NIL{});
         void tokenize_string();
         void tokenize_number();
         void tokenize_identifier();
         [[nodiscard]] TokenType check_identifier() const;
+        void report_error(const std::string &message) const;
     };
 }

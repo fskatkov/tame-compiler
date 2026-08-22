@@ -26,5 +26,6 @@ namespace tame::frontend {
         TokenType type;
         std::string lexeme;
         Value literal;
+        SourceLocation source_location;
     };
 }
