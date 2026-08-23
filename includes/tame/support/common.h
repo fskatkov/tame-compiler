@@ -40,3 +40,18 @@ struct SourceLocation {
     std::size_t offset{0};
     std::size_t length{1};
 };
+
+enum class Instruction {
+    OP_CONSTANT, OP_NULL,
+
+    OP_ADD, OP_SUB,
+    OP_MUL, OP_DIV,
+
+    OP_DEFINE_VARIABLE, OP_BUILD_TENSOR,
+    OP_GET_LOCAL, OP_SET_LOCAL,
+    OP_GET_GLOBAL, OP_SET_GLOBAL,
+
+    OP_POP, OP_RETURN,
+
+    OP_PRINT
+};
