@@ -32,6 +32,7 @@ namespace tame::frontend {
         bool is_reached_end();
         Token peek();
         Token previous();
+        void report_error(const std::string &message);
         Token consume(const TokenType &type, const std::string &message);
     };
 }

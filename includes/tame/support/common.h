@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <utility>
 #include <print>
+#include <algorithm>
 
 template<class... Ts>
 struct overloaded : Ts... {

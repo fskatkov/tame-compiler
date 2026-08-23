@@ -10,7 +10,7 @@ namespace tame::frontend {
     struct TensorStructure {
         using TensorStorage = std::variant<std::vector<float>, std::vector<int>>;
 
-        std::vector<std::size_t> tensor_shape;
+        std::vector<int> tensor_shape;
         TensorStorage tensor_data;
 
         [[nodiscard]] std::string get_shape() const {

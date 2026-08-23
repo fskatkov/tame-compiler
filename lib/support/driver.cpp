@@ -13,6 +13,9 @@ int tame::DriverEngine::execute() {
         }
 
         diagnostic_engine.init(user_input);
+        frontend::Parser parser(user_input, diagnostic_engine);
+        auto statements = parser.run();
+        diagnostic_engine.raise_errors();
     }
 
     return 0;

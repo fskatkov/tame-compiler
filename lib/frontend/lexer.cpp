@@ -211,6 +211,7 @@ TokenType Lexer::check_identifier() const {
             }
         }
         case 'p': return check(1, 4, "rint", TokenType::PRINT_TOKEN);
+        case 't': return check(1, 5, "ensor", TokenType::TENSOR_TYPE_TOKEN);
         case 'v': return check(1, 2, "ar", TokenType::VAR_TOKEN);
         case 'w': return check(1, 4, "hile", TokenType::WHILE_TOKEN);
         default: return TokenType::IDENTIFIER_TOKEN;
