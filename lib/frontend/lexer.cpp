@@ -154,9 +154,10 @@ void Lexer::tokenize_number() {
         advance();
     }
 
-    const auto is_floating_point = peek() == '.' && is_digit(peek_next());
+    bool is_floating_point = false;
+    if (peek() == '.' && is_digit(peek_next())) {
+        is_floating_point = true;
 
-    if (is_floating_point) {
         advance();
 
         while (is_digit(peek())) {
@@ -164,13 +165,18 @@ void Lexer::tokenize_number() {
         }
     }
 
+    const std::string_view numeric_str{
+        source_str.data() + start_ptr,
+        current_ptr - start_ptr
+    };
+
     if (is_floating_point) {
         float value{0};
-        std::from_chars(source_str.data() + start_ptr, source_str.data() + current_ptr, value);
+        std::from_chars(numeric_str.data(), numeric_str.data() + numeric_str.size(), value);
         add_token(TokenType::FLOAT_TOKEN, value);
     } else {
         int value{0};
-        std::from_chars(source_str.data() + start_ptr, source_str.data() + current_ptr, value);
+        std::from_chars(numeric_str.data(), numeric_str.data() + numeric_str.size(), value);
         add_token(TokenType::INT_TOKEN, value);
     }
 }

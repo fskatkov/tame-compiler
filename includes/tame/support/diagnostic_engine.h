@@ -16,6 +16,7 @@ namespace tame::diagnostics {
         explicit DiagnosticEngine() = default;
 
         bool encountered_error{false};
+        std::vector<DiagnosticReport> reports;
 
         void init(const std::string &source);
         void report(
@@ -25,7 +26,6 @@ namespace tame::diagnostics {
         );
         void raise_errors() const;
     private:
-        std::vector<DiagnosticReport> reports;
         std::string source_str;
     };
 }
