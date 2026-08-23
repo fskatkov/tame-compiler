@@ -13,9 +13,7 @@ namespace tame::backend {
     public:
         explicit Compiler();
 
-        std::unique_ptr<CodeBuffer> code_buffer;
-
-        void run(const std::vector<std::unique_ptr<ast::Stmt>> &statements);
+        std::unique_ptr<CodeBuffer> run(const std::vector<std::unique_ptr<ast::Stmt>> &statements);
 
         void visit_var_stmt(ast::VarStmt *stmt) override;
         void visit_expr_stmt(ast::ExprStmt *stmt) override;
@@ -27,6 +25,8 @@ namespace tame::backend {
         void visit_literal_expr(ast::LiteralExpr *expr) override;
         void visit_tensor_literal_expr(ast::TensorLiteralExpr *expr) override;
     private:
+        std::unique_ptr<CodeBuffer> code_buffer;
+
         std::vector<LocalVariable> local_variables;
 
         int scope_depth{0};

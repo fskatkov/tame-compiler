@@ -6,12 +6,13 @@ using namespace tame::backend;
 
 Compiler::Compiler() : code_buffer(std::make_unique<CodeBuffer>()) {  }
 
-void Compiler::run(const std::vector<std::unique_ptr<Stmt>> &statements) {
+std::unique_ptr<CodeBuffer> Compiler::run(const std::vector<std::unique_ptr<Stmt>> &statements) {
     for (const auto &statement : statements) {
         statement->accept(*this);
     }
 
     emit(std::to_underlying(Instruction::OP_RETURN));
+    return std::move(code_buffer);
 }
 
 void Compiler::visit_var_stmt(VarStmt *stmt) {

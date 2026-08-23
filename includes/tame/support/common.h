@@ -41,7 +41,7 @@ struct SourceLocation {
     std::size_t length{1};
 };
 
-enum class Instruction {
+enum class Instruction : std::uint8_t {
     OP_CONSTANT, OP_NULL,
 
     OP_ADD, OP_SUB,
