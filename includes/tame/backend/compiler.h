@@ -11,8 +11,10 @@ namespace tame::backend {
 
     class Compiler : public ast::ExprVisitor, public ast::StmtVisitor {
     public:
+        explicit Compiler() = default;
+
         std::unique_ptr<CodeBuffer> code_buffer;
-        explicit Compiler();
+
         void run(const std::vector<std::unique_ptr<ast::Stmt>> &statements);
 
         void visit_var_stmt(ast::VarStmt *stmt) override;
