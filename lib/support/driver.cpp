@@ -13,8 +13,11 @@ int tame::DriverEngine::execute() {
         }
 
         diagnostic_engine.init(user_input);
+
         frontend::Parser parser(user_input, diagnostic_engine);
-        auto statements = parser.run();
+        backend::Compiler compiler;
+        compiler.run(parser.run());
+
         diagnostic_engine.raise_errors();
     }
 

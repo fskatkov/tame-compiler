@@ -11,7 +11,7 @@ namespace tame::backend {
 
     class Compiler : public ast::ExprVisitor, public ast::StmtVisitor {
     public:
-        explicit Compiler() = default;
+        explicit Compiler();
 
         std::unique_ptr<CodeBuffer> code_buffer;
 
