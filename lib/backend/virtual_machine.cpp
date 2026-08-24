@@ -1,0 +1,86 @@
+#include "tame/backend/virtual_machine.h"
+
+using namespace tame::frontend;
+using namespace tame::backend;
+
+VirtualMachine::VirtualMachine() {
+    vm_stack.reserve(256);
+}
+
+VirtualMachineResult VirtualMachine::execute(std::unique_ptr<CodeBuffer> code_buffer) {
+    if (!code_buffer) {
+        return VirtualMachineResult::COMPILE_TIME_ERROR;
+    }
+
+    code_buffer_ = std::move(code_buffer_);
+    address = code_buffer_->data.data();
+    return execute_instruction();
+}
+
+std::uint8_t VirtualMachine::read_byte() {
+    return *address++;
+}
+
+Value VirtualMachine::read_constant() {
+    return code_buffer_->values.at(read_byte());
+}
+
+void VirtualMachine::reset_stack() {
+    vm_stack.clear();
+}
+
+void VirtualMachine::push(const Value &value) {
+    vm_stack.push_back(value);
+}
+
+Value VirtualMachine::pop() {
+    auto current_value = vm_stack.back();
+    vm_stack.pop_back();
+    return current_value;
+}
+
+Value VirtualMachine::peek(const int &distance) const {
+    return vm_stack.at(vm_stack.size() - distance - 1);
+}
+
+const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispatch_table = [] {
+    std::array<InstructionHandler, 256> table{};
+
+    table[std::to_underlying(Instruction::OP_CONSTANT)] = &VirtualMachine::execute_constant;
+    table[std::to_underlying(Instruction::OP_NULL)] = &VirtualMachine::execute_null_literal;
+
+    table[std::to_underlying(Instruction::OP_ADD)] = &VirtualMachine::execute_addition;
+    table[std::to_underlying(Instruction::OP_SUB)] = &VirtualMachine::execute_subtraction;
+    table[std::to_underlying(Instruction::OP_MUL)] = &VirtualMachine::execute_multiplication;
+    table[std::to_underlying(Instruction::OP_DIV)] = &VirtualMachine::execute_division;
+
+    table[std::to_underlying(Instruction::OP_DEFINE_VARIABLE)] = &VirtualMachine::execute_define_global_variable;
+    table[std::to_underlying(Instruction::OP_BUILD_TENSOR)] = &VirtualMachine::execute_build_tensor;
+
+    table[std::to_underlying(Instruction::OP_GET_GLOBAL)] = &VirtualMachine::execute_get_global_variable;
+    table[std::to_underlying(Instruction::OP_SET_GLOBAL)] = &VirtualMachine::execute_set_global_variable;
+    table[std::to_underlying(Instruction::OP_GET_LOCAL)] = &VirtualMachine::execute_get_local_variable;
+    table[std::to_underlying(Instruction::OP_SET_LOCAL)] = &VirtualMachine::execute_set_local_variable;
+
+    table[std::to_underlying(Instruction::OP_POP)] = &VirtualMachine::execute_pop;
+    table[std::to_underlying(Instruction::OP_PRINT)] = &VirtualMachine::execute_print;
+    table[std::to_underlying(Instruction::OP_RETURN)] = &VirtualMachine::execute_return;
+
+    return table;
+}();
+
+VirtualMachineResult VirtualMachine::execute_instruction() {
+    while (true) {
+        const auto current_instruction = (this->*dispatch_table.at(read_byte()))();
+
+        if (current_instruction == VirtualMachineResult::OK) {
+            continue;
+        }
+
+        if (current_instruction == VirtualMachineResult::HALT) {
+            return VirtualMachineResult::OK;
+        }
+
+        return current_instruction;
+    }
+}

@@ -14,6 +14,7 @@
 #include <print>
 #include <algorithm>
 #include <span>
+#include <unordered_map>
 
 template<class... Ts>
 struct overloaded : Ts... {
@@ -55,4 +56,11 @@ enum class Instruction : std::uint8_t {
     OP_POP, OP_RETURN,
 
     OP_PRINT
+};
+
+enum class VirtualMachineResult {
+    COMPILE_TIME_ERROR,
+    RUNTIME_ERROR,
+    HALT,
+    OK,
 };
