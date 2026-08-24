@@ -18,6 +18,9 @@ namespace tame::backend {
         std::uint8_t read_byte();
         frontend::Value read_constant();
 
+        template<typename... T>
+        VirtualMachineResult execute_operation(T... operands);
+
         void reset_stack();
         void push(const frontend::Value &value);
         frontend::Value pop();
@@ -29,19 +32,18 @@ namespace tame::backend {
         VirtualMachineResult execute_instruction();
 
         inline VirtualMachineResult execute_constant();
-        inline VirtualMachineResult execute_null_literal();
 
         inline VirtualMachineResult execute_addition();
         inline VirtualMachineResult execute_subtraction();
         inline VirtualMachineResult execute_multiplication();
         inline VirtualMachineResult execute_division();
 
-        inline VirtualMachineResult execute_define_global_variable();
-        inline VirtualMachineResult execute_build_tensor();
-        inline VirtualMachineResult execute_get_global_variable();
-        inline VirtualMachineResult execute_set_global_variable();
-        inline VirtualMachineResult execute_get_local_variable();
-        inline VirtualMachineResult execute_set_local_variable();
+        // inline VirtualMachineResult execute_define_global_variable();
+        // inline VirtualMachineResult execute_build_tensor();
+        // inline VirtualMachineResult execute_get_global_variable();
+        // inline VirtualMachineResult execute_set_global_variable();
+        // inline VirtualMachineResult execute_get_local_variable();
+        // inline VirtualMachineResult execute_set_local_variable();
 
         inline VirtualMachineResult execute_pop();
         inline VirtualMachineResult execute_print();

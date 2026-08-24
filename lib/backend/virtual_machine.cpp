@@ -12,7 +12,7 @@ VirtualMachineResult VirtualMachine::execute(std::unique_ptr<CodeBuffer> code_bu
         return VirtualMachineResult::COMPILE_TIME_ERROR;
     }
 
-    code_buffer_ = std::move(code_buffer_);
+    code_buffer_ = std::move(code_buffer);
     address = code_buffer_->data.data();
     return execute_instruction();
 }
@@ -23,6 +23,19 @@ std::uint8_t VirtualMachine::read_byte() {
 
 Value VirtualMachine::read_constant() {
     return code_buffer_->values.at(read_byte());
+}
+
+template<typename... T>
+VirtualMachineResult VirtualMachine::execute_operation(T... operands) {
+    const auto rhs = pop();
+    const auto lhs = pop();
+
+    return std::visit<VirtualMachineResult>(overloaded{
+        operands...,
+        [](const auto &, const auto &) {
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+    }, lhs.value, rhs.value);
 }
 
 void VirtualMachine::reset_stack() {
@@ -47,20 +60,19 @@ const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispat
     std::array<InstructionHandler, 256> table{};
 
     table[std::to_underlying(Instruction::OP_CONSTANT)] = &VirtualMachine::execute_constant;
-    table[std::to_underlying(Instruction::OP_NULL)] = &VirtualMachine::execute_null_literal;
 
     table[std::to_underlying(Instruction::OP_ADD)] = &VirtualMachine::execute_addition;
     table[std::to_underlying(Instruction::OP_SUB)] = &VirtualMachine::execute_subtraction;
     table[std::to_underlying(Instruction::OP_MUL)] = &VirtualMachine::execute_multiplication;
     table[std::to_underlying(Instruction::OP_DIV)] = &VirtualMachine::execute_division;
 
-    table[std::to_underlying(Instruction::OP_DEFINE_VARIABLE)] = &VirtualMachine::execute_define_global_variable;
-    table[std::to_underlying(Instruction::OP_BUILD_TENSOR)] = &VirtualMachine::execute_build_tensor;
-
-    table[std::to_underlying(Instruction::OP_GET_GLOBAL)] = &VirtualMachine::execute_get_global_variable;
-    table[std::to_underlying(Instruction::OP_SET_GLOBAL)] = &VirtualMachine::execute_set_global_variable;
-    table[std::to_underlying(Instruction::OP_GET_LOCAL)] = &VirtualMachine::execute_get_local_variable;
-    table[std::to_underlying(Instruction::OP_SET_LOCAL)] = &VirtualMachine::execute_set_local_variable;
+    // table[std::to_underlying(Instruction::OP_DEFINE_VARIABLE)] = &VirtualMachine::execute_define_global_variable;
+    // table[std::to_underlying(Instruction::OP_BUILD_TENSOR)] = &VirtualMachine::execute_build_tensor;
+    //
+    // table[std::to_underlying(Instruction::OP_GET_GLOBAL)] = &VirtualMachine::execute_get_global_variable;
+    // table[std::to_underlying(Instruction::OP_SET_GLOBAL)] = &VirtualMachine::execute_set_global_variable;
+    // table[std::to_underlying(Instruction::OP_GET_LOCAL)] = &VirtualMachine::execute_get_local_variable;
+    // table[std::to_underlying(Instruction::OP_SET_LOCAL)] = &VirtualMachine::execute_set_local_variable;
 
     table[std::to_underlying(Instruction::OP_POP)] = &VirtualMachine::execute_pop;
     table[std::to_underlying(Instruction::OP_PRINT)] = &VirtualMachine::execute_print;
@@ -83,4 +95,85 @@ VirtualMachineResult VirtualMachine::execute_instruction() {
 
         return current_instruction;
     }
+}
+
+inline VirtualMachineResult VirtualMachine::execute_constant() {
+    push(read_constant());
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_addition() {
+    return execute_operation(
+        [&](const int &first_operand, const int &second_operand) {
+            push(first_operand + second_operand);
+            return VirtualMachineResult::OK;
+        },
+        [&](const float &first_operand, const float &second_operand) {
+            push(first_operand + second_operand);
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+    );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_subtraction() {
+    return execute_operation(
+        [&](const int &first_operand, const int &second_operand) {
+            push(first_operand - second_operand);
+            return VirtualMachineResult::OK;
+        },
+        [&](const float &first_operand, const float &second_operand) {
+            push(first_operand - second_operand);
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+    );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_multiplication() {
+    return execute_operation(
+        [&](const int &first_operand, const int &second_operand) {
+            push(first_operand * second_operand);
+            return VirtualMachineResult::OK;
+        },
+        [&](const float &first_operand, const float &second_operand) {
+            push(first_operand * second_operand);
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+    );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_division() {
+    return execute_operation(
+        [&](const int &first_operand, const int &second_operand) {
+            push(first_operand / second_operand);
+            return VirtualMachineResult::OK;
+        },
+        [&](const float &first_operand, const float &second_operand) {
+            push(first_operand / second_operand);
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+    );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_pop() {
+    pop();
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_print() {
+    std::cout << peek(0).get_value() << "\n";
+    pop();
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_return() {
+    if (!vm_stack.empty()) {
+        const auto final_value = pop();
+        push(final_value);
+    }
+
+    return VirtualMachineResult::HALT;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_unknown_operation() {
+    return VirtualMachineResult::OK;
 }
