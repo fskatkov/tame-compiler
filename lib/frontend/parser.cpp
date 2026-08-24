@@ -7,7 +7,7 @@ using namespace tame::ast;
 Parser::Parser(DiagnosticEngine &diagnostic_engine)
     : diagnostic_engine(diagnostic_engine) {}
 
-std::vector<std::unique_ptr<Stmt>> Parser::run(const std::vector<Token> &tokens) {
+std::vector<std::unique_ptr<Stmt>> Parser::run(std::span<const Token> tokens) {
     tokens_ = tokens;
 
     std::vector<std::unique_ptr<Stmt>> statements;
@@ -192,11 +192,11 @@ bool Parser::is_reached_end() {
 }
 
 Token Parser::peek() {
-    return tokens_.at(current_ptr);
+    return tokens_[current_ptr];
 }
 
 Token Parser::previous() {
-    return tokens_.at(current_ptr - 1);
+    return tokens_[current_ptr - 1];
 }
 
 void Parser::report_error(const std::string &message) {

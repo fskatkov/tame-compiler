@@ -24,7 +24,7 @@ namespace tame::frontend {
 
     struct Token {
         TokenType type;
-        std::string lexeme;
+        std::string_view lexeme;
         Value literal;
         SourceLocation source_location;
     };

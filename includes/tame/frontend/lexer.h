@@ -7,11 +7,11 @@ namespace tame::frontend {
     class Lexer {
     public:
         explicit Lexer(diagnostics::DiagnosticEngine &diagnostic_engine);
-        std::vector<Token> tokenize(const std::string &source);
+        std::vector<Token> tokenize(std::string_view source);
     private:
         diagnostics::DiagnosticEngine &diagnostic_engine;
 
-        std::string source_;
+        std::string_view source_;
 
         std::size_t start_ptr{0};
         std::size_t current_ptr{0};
@@ -19,8 +19,6 @@ namespace tame::frontend {
         std::size_t start_line{1};
         std::size_t column_counter{1};
         std::size_t start_column{1};
-
-        bool encountered_error{false};
 
         std::vector<Token> tokens;
 

@@ -13,6 +13,7 @@
 #include <utility>
 #include <print>
 #include <algorithm>
+#include <span>
 
 template<class... Ts>
 struct overloaded : Ts... {

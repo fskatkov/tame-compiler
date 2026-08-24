@@ -1,8 +1,7 @@
 #pragma once
 
 #include "diagnostic_engine.h"
-#include "tame/frontend/parser.h"
-#include "tame/backend/compiler.h"
+#include "tame/frontend/lexer.h"
 
 namespace tame {
     class DriverEngine {

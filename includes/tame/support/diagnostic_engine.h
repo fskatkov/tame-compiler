@@ -18,7 +18,7 @@ namespace tame::diagnostics {
         bool encountered_error{false};
         std::vector<DiagnosticReport> reports;
 
-        void init(const std::string &source);
+        void init(std::string_view source);
         void report(
             DiagnosticReport::DiagnosticReportType report_type,
             const std::string &report_message,
@@ -26,6 +26,6 @@ namespace tame::diagnostics {
         );
         void raise_errors() const;
     private:
-        std::string source_str;
+        std::string_view source_str;
     };
 }

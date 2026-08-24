@@ -5,7 +5,7 @@ using namespace tame::frontend;
 Lexer::Lexer(diagnostics::DiagnosticEngine &diagnostic_engine)
     : diagnostic_engine(diagnostic_engine) {}
 
-std::vector<Token> Lexer::tokenize(const std::string &source) {
+std::vector<Token> Lexer::tokenize(std::string_view source) {
     source_ = source;
 
     while (!is_reached_end()) {
@@ -67,7 +67,7 @@ void Lexer::scan_next_token() {
                 tokenize_identifier();
             } else [[unlikely]] {
                 report_error("unexpected character");
-                encountered_error = true;
+                break;
             }
 
             break;
@@ -140,7 +140,6 @@ void Lexer::tokenize_string() {
 
     if (is_reached_end()) [[unlikely]] {
         report_error("unterminated string");
-        encountered_error = true;
         return;
     }
 

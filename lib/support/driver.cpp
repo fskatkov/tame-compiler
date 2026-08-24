@@ -14,9 +14,8 @@ int tame::DriverEngine::execute() {
 
         diagnostic_engine.init(user_input);
 
-        // frontend::Parser parser(user_input, diagnostic_engine);
-        // backend::Compiler compiler;
-        // compiler.run(parser.run());
+        frontend::Lexer lexer(diagnostic_engine);
+        auto tokens = lexer.tokenize(user_input);
 
         diagnostic_engine.raise_errors();
     }

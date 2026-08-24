@@ -2,7 +2,7 @@
 
 using namespace tame::diagnostics;
 
-void DiagnosticEngine::init(const std::string &source) {
+void DiagnosticEngine::init(std::string_view source) {
     source_str = source;
 }
 
@@ -58,13 +58,15 @@ void DiagnosticEngine::raise_errors() const {
 
         code_block = code_block.substr(0, code_block.find('\n'));
 
-        std::println(stdout, " {} | {}", source_location.line, code_block);
+        const std::string stringified_line = std::to_string(source_location.line);
+        std::println(stdout, " {} | {}", stringified_line, code_block);
+
+        const std::string padding(stringified_line.length(), ' ');
+        const std::string spaces(source_location.column > 1 ? source_location.column - 1 : 0, ' ');
 
         const std::size_t tilde_position = source_location.length > 0 ? source_location.length : 1;
-        std::println(stdout, " {} | {}^{}\033[0m",
-            std::string(source_location.line, ' '),
-            std::string(source_location.column > 1 ? source_location.column - 1 : 0, ' '),
-            std::string(tilde_position > 1 ? tilde_position - 1 : 0, '~')
-        );
+        const std::string tildes(tilde_position > 1 ? tilde_position - 1 : 0, '~');
+
+        std::println(stdout, " {} | {}^{}\033[0m", padding, spaces, tildes);
     }
 }
