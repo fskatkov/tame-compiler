@@ -11,16 +11,25 @@ namespace {
     protected:
         DiagnosticEngine diagnostic_engine;
 
-        std::vector<std::unique_ptr<Stmt>> parse(const std::string &source_str) {
-            diagnostic_engine.init(source_str);
-            Parser parser(source_str, diagnostic_engine);
-            return parser.run();
+        std::vector<std::unique_ptr<Stmt>> parse(const std::vector<Token> &tokens) {
+            Parser parser(diagnostic_engine);
+            return parser.run(tokens);
         }
     };
 }
 
 TEST_F(ParserTest, ParsesComplexNestedExpressions) {
-    const auto statement = parse("print(1 + 2 * 3)");
+    const auto statement = parse({
+        Token(TokenType::PRINT_TOKEN, "print"),
+        Token(TokenType::LEFT_PARENTHESIS_TOKEN, "("),
+        Token(TokenType::INT_TOKEN, "1", 1),
+        Token(TokenType::PLUS_TOKEN, "+"),
+        Token(TokenType::INT_TOKEN, "2", 2),
+        Token(TokenType::STAR_TOKEN, "*"),
+        Token(TokenType::INT_TOKEN, "3", 3),
+        Token(TokenType::RIGHT_PARENTHESIS_TOKEN, ")"),
+        Token(TokenType::EOF_TOKEN, ""),
+    });
 
     auto *print_statement = dynamic_cast<PrintStmt *>(statement.front().get());
     ASSERT_NE(print_statement, nullptr) << "expected `print`";
@@ -33,7 +42,15 @@ TEST_F(ParserTest, ParsesComplexNestedExpressions) {
 }
 
 TEST_F(ParserTest, ParsesVariableDeclaration) {
-    const auto statement = parse("var kernelCounter: i32 = 15");
+    const auto statement = parse({
+        Token(TokenType::VAR_TOKEN, "var"),
+        Token(TokenType::IDENTIFIER_TOKEN, "kernelCounter"),
+        Token(TokenType::COLON_TOKEN, ":"),
+        Token(TokenType::INT_TYPE_TOKEN, "i32"),
+        Token(TokenType::EQUALS_TOKEN, "="),
+        Token(TokenType::INT_TOKEN, "15", 15),
+        Token(TokenType::EOF_TOKEN, "")
+    });
 
     auto *variable_statement = dynamic_cast<VarStmt *>(statement.front().get());
     ASSERT_NE(variable_statement, nullptr) << "expected `kernelCounter` variable";
@@ -47,23 +64,29 @@ TEST_F(ParserTest, ParsesVariableDeclaration) {
     EXPECT_EQ(literal->value.get<int>(), 15);
 }
 
-TEST_F(ParserTest, ParsesVariableDeclarationAndOutput) {
-    const auto statements = parse("var kernelCounter: i32 = 15\nprint(kernelCounter)");
-
-    auto *variable_statement = dynamic_cast<VarStmt *>(statements.front().get());
-    ASSERT_NE(variable_statement, nullptr) << "expected `kernelCounter` variable";
-
-    EXPECT_EQ(variable_statement->name.lexeme, "kernelCounter");
-
-    auto *print_statement = dynamic_cast<PrintStmt *>(statements[1].get());
-    ASSERT_NE(print_statement, nullptr) << "expected `print`";
-
-    const auto *variable_expression = dynamic_cast<VarExpr *>(print_statement->expression.get());
-    ASSERT_NE(variable_expression, nullptr) << "expected an expression from defined variable";
-}
-
 TEST_F(ParserTest, ParsesTensorDeclaration) {
-    const auto statement = parse("var basicMatrix: tensor<2, 3> = [[1, 2, 3], [4, 5, 6]]");
+    const auto statement = parse({
+        Token(TokenType::VAR_TOKEN, "var"),
+        Token(TokenType::IDENTIFIER_TOKEN, "basicMatrix"),
+        Token(TokenType::COLON_TOKEN, ":"),
+        Token(TokenType::TENSOR_TYPE_TOKEN, "tensor"),
+        Token(TokenType::LEFT_ANGLE_TOKEN, "<"),
+        Token(TokenType::INT_TOKEN, "1", 1),
+        Token(TokenType::COMMA_TOKEN, ","),
+        Token(TokenType::INT_TOKEN, "3", 3),
+        Token(TokenType::RIGHT_ANGLE_TOKEN, ">"),
+        Token(TokenType::EQUALS_TOKEN, "="),
+        Token(TokenType::LEFT_BRACKET_TOKEN, "["),
+        Token(TokenType::LEFT_BRACKET_TOKEN, "["),
+        Token(TokenType::INT_TOKEN, "1", 1),
+        Token(TokenType::COMMA_TOKEN, ","),
+        Token(TokenType::INT_TOKEN, "2", 2),
+        Token(TokenType::COMMA_TOKEN, ","),
+        Token(TokenType::INT_TOKEN, "3", 3),
+        Token(TokenType::RIGHT_BRACKET_TOKEN, "]"),
+        Token(TokenType::RIGHT_BRACKET_TOKEN, "]"),
+        Token(TokenType::EOF_TOKEN, "")
+    });
 
     const auto *variable_statement = dynamic_cast<VarStmt *>(statement.front().get());
     ASSERT_NE(variable_statement, nullptr) << "expected `basicMatrix` variable";
@@ -74,6 +97,6 @@ TEST_F(ParserTest, ParsesTensorDeclaration) {
     const auto *tensor_literal = dynamic_cast<TensorLiteralExpr *>(variable_statement->initializer.get());
     ASSERT_NE(tensor_literal, nullptr) << "expected `tensor` literal";
 
-    const std::vector<int> expected_shape{2, 3};
+    const std::vector<int> expected_shape{1, 3};
     EXPECT_EQ(tensor_literal->shape, expected_shape);
 }

@@ -11,23 +11,18 @@ using namespace tame::backend;
 namespace {
     class CompilerTest : public ::testing::Test {
     protected:
-        DiagnosticEngine diagnostic_engine;
-
-        std::unique_ptr<CodeBuffer> compile(const std::string &source_str) {
-            diagnostic_engine.init(source_str);
-
-            Parser parser(source_str, diagnostic_engine);
-            const auto statements = parser.run();
-
+        static std::unique_ptr<CodeBuffer> compile(const std::vector<std::unique_ptr<Stmt>> &statements) {
             Compiler compiler;
-            auto code_buffer = compiler.run(statements);
-            return std::move(code_buffer);
+            return std::move(compiler.run(statements));
         }
     };
 }
 
-TEST_F(CompilerTest, EmitsPrint) {
-    const auto code_buffer = compile("print(15)");
+TEST_F(CompilerTest, EmitsBasicPrint) {
+    std::vector<std::unique_ptr<Stmt>> statements;
+    statements.push_back(std::move(std::make_unique<PrintStmt>(std::make_unique<LiteralExpr>(15))));
+
+    const auto code_buffer = compile(statements);
 
     ASSERT_NE(code_buffer, nullptr) << "code buffer should be initialized";
     EXPECT_EQ(code_buffer->data.front(), std::to_underlying(Instruction::OP_CONSTANT));
@@ -35,7 +30,17 @@ TEST_F(CompilerTest, EmitsPrint) {
 }
 
 TEST_F(CompilerTest, EmitsVariableDeclaration) {
-    const auto code_buffer = compile("var kernelSize: i32 = 42\nprint(kernelSize)");
+    std::vector<std::unique_ptr<Stmt>> statements;
+    statements.push_back(std::make_unique<VarStmt>(
+        Token(TokenType::IDENTIFIER_TOKEN, "kernelSize"),
+        std::make_unique<IntTypeAnnotation>(),
+        std::make_unique<LiteralExpr>(42)
+    ));
+    statements.push_back(std::make_unique<PrintStmt>(std::make_unique<VarExpr>(
+        Token(TokenType::IDENTIFIER_TOKEN, "kernelSize")
+    )));
+
+    const auto code_buffer = compile(statements);
     ASSERT_NE(code_buffer, nullptr) << "code buffer should be initialized";
 
     EXPECT_EQ(code_buffer->values.at(0).get<int>(), 42) << "expected kernelSize value in the constant pool";
@@ -45,7 +50,27 @@ TEST_F(CompilerTest, EmitsVariableDeclaration) {
 }
 
 TEST_F(CompilerTest, EmitsTensorDeclaration) {
-    const auto code_buffer = compile("var randomMatrix: tensor<2, 3> = [[1, 2, 3], [4, 5, 6]]");
+    std::vector<int> tensor_shape{2, 3};
+
+    std::vector<std::unique_ptr<Expr>> tensor_data;
+    tensor_data.push_back(std::make_unique<LiteralExpr>(1));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(2));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(3));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(4));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(5));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(6));
+
+    std::vector<std::unique_ptr<Stmt>> statements;
+    statements.push_back(std::make_unique<VarStmt>(
+        Token(TokenType::IDENTIFIER_TOKEN, "randomMatrix"),
+        std::make_unique<TensorTypeAnnotation>(tensor_shape),
+        std::make_unique<TensorLiteralExpr>(tensor_shape, std::move(tensor_data))
+    ));
+    statements.push_back(std::make_unique<PrintStmt>(std::make_unique<VarExpr>(
+        Token(TokenType::IDENTIFIER_TOKEN, "randomMatrix")
+    )));
+
+    const auto code_buffer = compile(statements);
     ASSERT_NE(code_buffer, nullptr) << "code buffer should be initialized";
 
     for (int i = 0; i < 6; ++i) {

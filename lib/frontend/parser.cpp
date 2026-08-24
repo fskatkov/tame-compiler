@@ -4,12 +4,12 @@ using namespace tame::frontend;
 using namespace tame::diagnostics;
 using namespace tame::ast;
 
-Parser::Parser(std::string source, DiagnosticEngine &diagnostic_engine) : diagnostic_engine(diagnostic_engine) {
-    Lexer lexer(std::move(source), diagnostic_engine);
-    tokens = lexer.tokenize();
-}
+Parser::Parser(DiagnosticEngine &diagnostic_engine)
+    : diagnostic_engine(diagnostic_engine) {}
 
-std::vector<std::unique_ptr<Stmt>> Parser::run() {
+std::vector<std::unique_ptr<Stmt>> Parser::run(const std::vector<Token> &tokens) {
+    tokens_ = tokens;
+
     std::vector<std::unique_ptr<Stmt>> statements;
     while (!is_reached_end()) {
         statements.push_back(parse_declaration());
@@ -164,7 +164,7 @@ std::unique_ptr<Expr> Parser::parse_primary_expression() {
     }
 
     report_error("expected expression");
-
+    advance();
     return nullptr;
 }
 
@@ -192,11 +192,11 @@ bool Parser::is_reached_end() {
 }
 
 Token Parser::peek() {
-    return tokens.at(current_ptr);
+    return tokens_.at(current_ptr);
 }
 
 Token Parser::previous() {
-    return tokens.at(current_ptr - 1);
+    return tokens_.at(current_ptr - 1);
 }
 
 void Parser::report_error(const std::string &message) {

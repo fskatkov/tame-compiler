@@ -6,12 +6,12 @@
 namespace tame::frontend {
     class Lexer {
     public:
-        explicit Lexer(std::string source, diagnostics::DiagnosticEngine &diagnostic_engine);
-        std::vector<Token> tokenize();
+        explicit Lexer(diagnostics::DiagnosticEngine &diagnostic_engine);
+        std::vector<Token> tokenize(const std::string &source);
     private:
         diagnostics::DiagnosticEngine &diagnostic_engine;
 
-        std::string source_str;
+        std::string source_;
 
         std::size_t start_ptr{0};
         std::size_t current_ptr{0};

@@ -10,10 +10,10 @@ namespace {
     protected:
         DiagnosticEngine diagnostic_engine;
 
-        std::vector<Token> tokenize(const std::string &source_str) {
-            diagnostic_engine.init(source_str);
-            Lexer lexer(source_str, diagnostic_engine);
-            return lexer.tokenize();
+        std::vector<Token> tokenize(const std::string &source) {
+            diagnostic_engine.init(source);
+            Lexer lexer(diagnostic_engine);
+            return lexer.tokenize(source);
         }
     };
 }

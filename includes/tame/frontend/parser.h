@@ -7,12 +7,12 @@
 namespace tame::frontend {
     class Parser {
     public:
-        explicit Parser(std::string source, diagnostics::DiagnosticEngine &diagnostic_engine);
-        std::vector<std::unique_ptr<ast::Stmt>> run();
+        explicit Parser(diagnostics::DiagnosticEngine &diagnostic_engine);
+        std::vector<std::unique_ptr<ast::Stmt>> run(const std::vector<Token> &tokens);
     private:
         diagnostics::DiagnosticEngine &diagnostic_engine;
 
-        std::vector<Token> tokens;
+        std::vector<Token> tokens_;
         std::size_t current_ptr{0};
 
         std::unique_ptr<ast::Stmt> parse_declaration();

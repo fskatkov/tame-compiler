@@ -2,10 +2,12 @@
 
 using namespace tame::frontend;
 
-Lexer::Lexer(std::string source, diagnostics::DiagnosticEngine &diagnostic_engine)
-    : diagnostic_engine(diagnostic_engine), source_str(std::move(source)) {}
+Lexer::Lexer(diagnostics::DiagnosticEngine &diagnostic_engine)
+    : diagnostic_engine(diagnostic_engine) {}
 
-std::vector<Token> Lexer::tokenize() {
+std::vector<Token> Lexer::tokenize(const std::string &source) {
+    source_ = source;
+
     while (!is_reached_end()) {
         start_ptr = current_ptr;
         start_line = line_counter;
@@ -74,11 +76,11 @@ void Lexer::scan_next_token() {
 }
 
 bool Lexer::is_reached_end() const {
-    return current_ptr >= source_str.length();
+    return current_ptr >= source_.length();
 }
 
 char Lexer::advance() {
-    const auto current_character = source_str.at(current_ptr++);
+    const auto current_character = source_.at(current_ptr++);
 
     if (current_character == '\n') [[unlikely]] {
         line_counter++;
@@ -92,16 +94,16 @@ char Lexer::advance() {
 
 char Lexer::peek() const {
     if (is_reached_end()) [[unlikely]] return '\0';
-    return source_str.at(current_ptr);
+    return source_.at(current_ptr);
 }
 
 char Lexer::peek_next() const {
-    if (current_ptr + 1 >= source_str.length()) [[unlikely]] return '\0';
-    return source_str.at(current_ptr + 1);
+    if (current_ptr + 1 >= source_.length()) [[unlikely]] return '\0';
+    return source_.at(current_ptr + 1);
 }
 
 bool Lexer::match(const char &expected_symbol) {
-    if (is_reached_end() || source_str.at(current_ptr) != expected_symbol) return false;
+    if (is_reached_end() || source_.at(current_ptr) != expected_symbol) return false;
     current_ptr++;
     column_counter++;
     return true;
@@ -109,7 +111,7 @@ bool Lexer::match(const char &expected_symbol) {
 
 TokenType Lexer::check(std::size_t starting, std::size_t ending, const std::string &rest, TokenType kind) const {
     if (current_ptr - start_ptr == starting + ending) {
-        if (const std::string_view text(source_str.data() + start_ptr + starting, ending); text == rest) {
+        if (const std::string_view text(source_.data() + start_ptr + starting, ending); text == rest) {
             return kind;
         }
     }
@@ -120,7 +122,7 @@ TokenType Lexer::check(std::size_t starting, std::size_t ending, const std::stri
 void Lexer::add_token(const TokenType &token_type, const Value &token_literal) {
     tokens.emplace_back(
         token_type,
-        source_str.substr(start_ptr, current_ptr - start_ptr),
+        source_.substr(start_ptr, current_ptr - start_ptr),
         token_literal,
         SourceLocation{
             .line = start_line,
@@ -145,7 +147,7 @@ void Lexer::tokenize_string() {
     advance();
     add_token(
         TokenType::STRING_TOKEN,
-        std::make_shared<std::string>(source_str.substr(start_ptr + 1, current_ptr - start_ptr - 2))
+        std::make_shared<std::string>(source_.substr(start_ptr + 1, current_ptr - start_ptr - 2))
     );
 }
 
@@ -166,7 +168,7 @@ void Lexer::tokenize_number() {
     }
 
     const std::string_view numeric_str{
-        source_str.data() + start_ptr,
+        source_.data() + start_ptr,
         current_ptr - start_ptr
     };
 
@@ -190,11 +192,11 @@ void Lexer::tokenize_identifier() {
 }
 
 TokenType Lexer::check_identifier() const {
-    switch (source_str.at(start_ptr)) {
+    switch (source_.at(start_ptr)) {
         case 'e': return check(1, 3, "lse", TokenType::ELSE_TOKEN);
         case 'f': {
             if (current_ptr - start_ptr > 1) {
-                switch (source_str.at(start_ptr + 1)) {
+                switch (source_.at(start_ptr + 1)) {
                     case 'o': return check(2, 1, "r", TokenType::FOR_TOKEN);
                     case '3': return check(2, 1, "2", TokenType::FLOAT_TYPE_TOKEN);
                     default: return TokenType::IDENTIFIER_TOKEN;
@@ -203,7 +205,7 @@ TokenType Lexer::check_identifier() const {
         }
         case 'i': {
             if (current_ptr - start_ptr > 1) {
-                switch (source_str.at(start_ptr + 1)) {
+                switch (source_.at(start_ptr + 1)) {
                     case 'f': return check(2, 0, "", TokenType::IF_TOKEN);
                     case '3': return check(2, 1, "2", TokenType::INT_TYPE_TOKEN);
                     default: return TokenType::IDENTIFIER_TOKEN;
