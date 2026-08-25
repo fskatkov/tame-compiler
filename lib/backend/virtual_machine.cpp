@@ -3,7 +3,7 @@
 using namespace tame::frontend;
 using namespace tame::backend;
 
-VirtualMachine::VirtualMachine() {
+VirtualMachine::VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine) : diagnostic_engine(diagnostic_engine) {
     vm_stack.reserve(256);
 }
 
@@ -26,13 +26,19 @@ Value VirtualMachine::read_constant() {
 }
 
 template<typename... T>
-VirtualMachineResult VirtualMachine::execute_operation(T... operands) {
+VirtualMachineResult VirtualMachine::execute_operation(const std::string &symbol, T... operands) {
     const auto rhs = pop();
     const auto lhs = pop();
 
     return std::visit<VirtualMachineResult>(overloaded{
         operands...,
-        [](const auto &, const auto &) {
+        [&](const auto &, const auto &) {
+            report_error(std::format("unsupported operand types for `{}`: [{}] and [{}]",
+                symbol,
+                lhs.get_type(),
+                rhs.get_type()
+            ));
+
             return VirtualMachineResult::RUNTIME_ERROR;
         }
     }, lhs.value, rhs.value);
@@ -54,6 +60,16 @@ Value VirtualMachine::pop() {
 
 Value VirtualMachine::peek(const int &distance) const {
     return vm_stack.at(vm_stack.size() - distance - 1);
+}
+
+void VirtualMachine:: report_error(const std::string &message) {
+    diagnostic_engine.report(
+        diagnostics::DiagnosticReport::DiagnosticReportType::FATAL,
+        message,
+        SourceLocation{}
+    );
+
+    reset_stack();
 }
 
 const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispatch_table = [] {
@@ -102,7 +118,7 @@ inline VirtualMachineResult VirtualMachine::execute_constant() {
 }
 
 inline VirtualMachineResult VirtualMachine::execute_addition() {
-    return execute_operation(
+    return execute_operation("+",
         [&](const int &first_operand, const int &second_operand) {
             push(first_operand + second_operand);
             return VirtualMachineResult::OK;
@@ -115,7 +131,7 @@ inline VirtualMachineResult VirtualMachine::execute_addition() {
 }
 
 inline VirtualMachineResult VirtualMachine::execute_subtraction() {
-    return execute_operation(
+    return execute_operation("-",
         [&](const int &first_operand, const int &second_operand) {
             push(first_operand - second_operand);
             return VirtualMachineResult::OK;
@@ -128,7 +144,7 @@ inline VirtualMachineResult VirtualMachine::execute_subtraction() {
 }
 
 inline VirtualMachineResult VirtualMachine::execute_multiplication() {
-    return execute_operation(
+    return execute_operation("*",
         [&](const int &first_operand, const int &second_operand) {
             push(first_operand * second_operand);
             return VirtualMachineResult::OK;
@@ -141,7 +157,7 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
 }
 
 inline VirtualMachineResult VirtualMachine::execute_division() {
-    return execute_operation(
+    return execute_operation("/",
         [&](const int &first_operand, const int &second_operand) {
             push(first_operand / second_operand);
             return VirtualMachineResult::OK;
@@ -166,6 +182,7 @@ inline VirtualMachineResult VirtualMachine::execute_get_global_variable() {
     if (const auto it = vm_variables.find(*variable_name); it != vm_variables.end()) {
         push(it->second);
     } else {
+        report_error(std::format("undefined variable `{}`", *variable_name));
         return VirtualMachineResult::RUNTIME_ERROR;
     }
 
@@ -178,6 +195,7 @@ inline VirtualMachineResult VirtualMachine::execute_set_global_variable() {
     if (const auto it = vm_variables.find(*variable_name); it != vm_variables.end()) {
         vm_variables.insert_or_assign(*variable_name, peek(0));
     } else {
+        report_error(std::format("undefined variable `{}`", *variable_name));
         return VirtualMachineResult::RUNTIME_ERROR;
     }
 

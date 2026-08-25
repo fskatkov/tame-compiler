@@ -4,10 +4,12 @@
 #include "tame/backend/compiler.h"
 #include "tame/ast/stmt.h"
 #include "tame/structures/token.h"
+#include "tame/support/diagnostic_engine.h"
 
 using namespace tame::ast;
 using namespace tame::frontend;
 using namespace tame::backend;
+using namespace tame::diagnostics;
 
 namespace {
     class VirtualMachineTest : public ::testing::Test {
@@ -30,7 +32,8 @@ TEST_F(VirtualMachineTest, ComputeBasicTwoOperandsAddtion) {
         )
     ));
 
-    VirtualMachine virtual_machine;
+    DiagnosticEngine diagnostic_engine;
+    VirtualMachine virtual_machine(diagnostic_engine);
 
     testing::internal::CaptureStdout();
 
@@ -65,7 +68,8 @@ TEST_F(VirtualMachineTest, ComputeVariableDeclarations) {
         )
     ));
 
-    VirtualMachine virtual_machine;
+    DiagnosticEngine diagnostic_engine;
+    VirtualMachine virtual_machine(diagnostic_engine);
 
     testing::internal::CaptureStdout();
 

@@ -1,14 +1,17 @@
 #pragma once
 
 #include "tame/support/common.h"
+#include "tame/support/diagnostic_engine.h"
 #include "tame/structures/code_buffer.h"
 
 namespace tame::backend {
     class VirtualMachine {
     public:
-        explicit VirtualMachine();
+        explicit VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine);
         VirtualMachineResult execute(std::unique_ptr<CodeBuffer> code_buffer);
     private:
+        diagnostics::DiagnosticEngine &diagnostic_engine;
+
         std::unique_ptr<CodeBuffer> code_buffer_;
         const std::uint8_t *address = nullptr;
 
@@ -19,12 +22,14 @@ namespace tame::backend {
         frontend::Value read_constant();
 
         template<typename... T>
-        VirtualMachineResult execute_operation(T... operands);
+        VirtualMachineResult execute_operation(const std::string &symbol, T... operands);
 
         void reset_stack();
         void push(const frontend::Value &value);
         frontend::Value pop();
         [[nodiscard]] frontend::Value peek(const int &distance) const;
+
+        void report_error(const std::string &message);
 
         using InstructionHandler = VirtualMachineResult (VirtualMachine::*)();
         static const std::array<InstructionHandler, 256> dispatch_table;

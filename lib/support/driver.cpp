@@ -3,11 +3,10 @@
 using namespace tame::diagnostics;
 
 int tame::DriverEngine::execute() {
-    backend::VirtualMachine virtual_machine;
+    DiagnosticEngine diagnostic_engine;
+    backend::VirtualMachine virtual_machine(diagnostic_engine);
 
     while (true) {
-        DiagnosticEngine diagnostic_engine;
-
         std::cout << "> " << std::flush;
 
         std::string user_input;
