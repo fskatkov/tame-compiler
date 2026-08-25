@@ -63,10 +63,13 @@ Value VirtualMachine::peek(const int &distance) const {
 }
 
 void VirtualMachine:: report_error(const std::string &message) {
+    const std::size_t instruction_index = std::distance(code_buffer_->data.data(), address) - 1;
+    const auto location = code_buffer_->locations[instruction_index];
+
     diagnostic_engine.report(
         diagnostics::DiagnosticReport::DiagnosticReportType::FATAL,
         message,
-        SourceLocation{}
+        location
     );
 
     reset_stack();
@@ -76,6 +79,7 @@ const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispat
     std::array<InstructionHandler, 256> table{};
 
     table[std::to_underlying(Instruction::OP_CONSTANT)] = &VirtualMachine::execute_constant;
+    table[std::to_underlying(Instruction::OP_BUILD_TENSOR)] = &VirtualMachine::execute_tensor;
 
     table[std::to_underlying(Instruction::OP_ADD)] = &VirtualMachine::execute_addition;
     table[std::to_underlying(Instruction::OP_SUB)] = &VirtualMachine::execute_subtraction;
@@ -114,6 +118,69 @@ VirtualMachineResult VirtualMachine::execute_instruction() {
 
 inline VirtualMachineResult VirtualMachine::execute_constant() {
     push(read_constant());
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_tensor() {
+    const auto tensor_rank = read_byte();
+
+    std::vector<int> tensor_shape;
+    auto elements_quantity = 1;
+    for (int i = 0; i < tensor_rank; ++i) {
+        const auto dimension = read_byte();
+        tensor_shape.push_back(dimension);
+        elements_quantity *= dimension;
+    }
+
+    const auto tensor = std::make_shared<TensorStructure>();
+    tensor->tensor_shape = std::move(tensor_shape);
+
+    if (elements_quantity == 0) {
+        tensor->tensor_data = std::vector<float>{};
+        push(tensor);
+        return VirtualMachineResult::OK;
+    }
+
+    const auto initial_element = pop();
+
+    if (initial_element.is<float>()) {
+        std::vector<float> tensor_data(elements_quantity);
+        tensor_data.back() = initial_element.get<float>();
+
+        for (int i = elements_quantity - 2; i >= 0; --i) {
+            const auto element = pop();
+
+            if (!element.is<float>()) {
+                report_error(std::format("tensor type mismatch: expected f32, got {}", element.get_type()));
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+
+            tensor_data[i] = element.get<float>();
+        }
+
+        tensor->tensor_data = std::move(tensor_data);
+    } else if (initial_element.is<int>()) {
+        std::vector<int> tensor_data(elements_quantity);
+        tensor_data.back() = initial_element.get<int>();
+
+        for (int i = elements_quantity - 2; i >= 0; --i) {
+            const auto element = pop();
+
+            if (!element.is<int>()) {
+                report_error(std::format("tensor type mismatch: expected i32, got {}", element.get_type()));
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+
+            tensor_data[i] = element.get<int>();
+        }
+
+        tensor->tensor_data = std::move(tensor_data);
+    } else {
+        report_error(std::format("unsupported tensor element type: {}", initial_element.get_type()));
+        return VirtualMachineResult::RUNTIME_ERROR;
+    }
+
+    push(tensor);
     return VirtualMachineResult::OK;
 }
 

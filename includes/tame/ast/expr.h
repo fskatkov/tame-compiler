@@ -63,9 +63,10 @@ namespace tame::ast {
 
     struct LiteralExpr : public Expr {
         frontend::Value value;
+        frontend::Token starting_position;
 
-        explicit LiteralExpr(frontend::Value value)
-            : value(std::move(value)) {  }
+        explicit LiteralExpr(frontend::Value value, frontend::Token starting_position)
+            : value(std::move(value)), starting_position(std::move(starting_position)) {  }
 
         void accept(ExprVisitor &visitor) override {
             visitor.visit_literal_expr(this);

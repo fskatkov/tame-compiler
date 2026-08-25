@@ -11,7 +11,7 @@ std::unique_ptr<CodeBuffer> Compiler::run(const std::vector<std::unique_ptr<Stmt
         statement->accept(*this);
     }
 
-    emit(std::to_underlying(Instruction::OP_RETURN));
+    emit(std::to_underlying(Instruction::OP_RETURN), SourceLocation{});
     return std::move(code_buffer);
 }
 
@@ -19,7 +19,7 @@ void Compiler::visit_var_stmt(VarStmt *stmt) {
     if (stmt->initializer) {
         stmt->initializer->accept(*this);
     } else {
-        emit(std::to_underlying(Instruction::OP_NULL));
+        emit(std::to_underlying(Instruction::OP_NULL), stmt->name.source_location);
     }
 
     if (scope_depth > 0) {
@@ -29,28 +29,28 @@ void Compiler::visit_var_stmt(VarStmt *stmt) {
 
     code_buffer->add(std::make_shared<std::string>(stmt->name.lexeme));
 
-    emit(std::to_underlying(Instruction::OP_DEFINE_VARIABLE));
-    emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1));
+    emit(std::to_underlying(Instruction::OP_DEFINE_VARIABLE), SourceLocation{});
+    emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1), SourceLocation{});
 }
 
 void Compiler::visit_expr_stmt(ExprStmt *stmt) {
     stmt->expression->accept(*this);
-    emit(std::to_underlying(Instruction::OP_POP));
+    emit(std::to_underlying(Instruction::OP_POP), SourceLocation{});
 }
 
 void Compiler::visit_print_stmt(PrintStmt *stmt) {
     stmt->expression->accept(*this);
-    emit(std::to_underlying(Instruction::OP_PRINT));
+    emit(std::to_underlying(Instruction::OP_PRINT), SourceLocation{});
 }
 
 void Compiler::visit_var_expr(VarExpr *expr) {
     if (const auto arg = resolve_local_variable(expr->name); arg != -1) {
-        emit(std::to_underlying(Instruction::OP_GET_LOCAL));
-        emit(static_cast<std::uint8_t>(arg));
+        emit(std::to_underlying(Instruction::OP_GET_LOCAL), SourceLocation{});
+        emit(static_cast<std::uint8_t>(arg), SourceLocation{});
     } else {
         code_buffer->add(std::make_shared<std::string>(expr->name.lexeme));
-        emit(std::to_underlying(Instruction::OP_GET_GLOBAL));
-        emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1));
+        emit(std::to_underlying(Instruction::OP_GET_GLOBAL), SourceLocation{});
+        emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1), SourceLocation{});
     }
 }
 
@@ -59,12 +59,12 @@ void Compiler::visit_assign_expr(AssignExpr *expr) {
         expr->rhs->accept(*this);
 
         if (const auto arg = resolve_local_variable(variable_expression->name); arg != -1) {
-            emit(std::to_underlying(Instruction::OP_SET_LOCAL));
-            emit(static_cast<std::uint8_t>(arg));
+            emit(std::to_underlying(Instruction::OP_SET_LOCAL), SourceLocation{});
+            emit(static_cast<std::uint8_t>(arg), SourceLocation{});
         } else {
             code_buffer->add(std::make_shared<std::string>(variable_expression->name.lexeme));
-            emit(std::to_underlying(Instruction::OP_SET_GLOBAL));
-            emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1));
+            emit(std::to_underlying(Instruction::OP_SET_GLOBAL), SourceLocation{});
+            emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1), SourceLocation{});
         }
     }
 }
@@ -74,16 +74,16 @@ void Compiler::visit_binary_expr(BinaryExpr *expr) {
     expr->rhs->accept(*this);
 
     switch (expr->operator_token.type) {
-        case TokenType::PLUS_TOKEN:  emit(std::to_underlying(Instruction::OP_ADD)); break;
-        case TokenType::MINUS_TOKEN: emit(std::to_underlying(Instruction::OP_SUB)); break;
-        case TokenType::STAR_TOKEN:  emit(std::to_underlying(Instruction::OP_MUL)); break;
-        case TokenType::SLASH_TOKEN: emit(std::to_underlying(Instruction::OP_DIV)); break;
+        case TokenType::PLUS_TOKEN:  emit(std::to_underlying(Instruction::OP_ADD), SourceLocation{}); break;
+        case TokenType::MINUS_TOKEN: emit(std::to_underlying(Instruction::OP_SUB), SourceLocation{}); break;
+        case TokenType::STAR_TOKEN:  emit(std::to_underlying(Instruction::OP_MUL), SourceLocation{}); break;
+        case TokenType::SLASH_TOKEN: emit(std::to_underlying(Instruction::OP_DIV), SourceLocation{}); break;
         default: break;
     }
 }
 
 void Compiler::visit_literal_expr(LiteralExpr *expr) {
-    code_buffer->insert_value(expr->value);
+    code_buffer->insert_value(expr->value, expr->starting_position.source_location);
 }
 
 void Compiler::visit_tensor_literal_expr(TensorLiteralExpr *expr) {
@@ -91,16 +91,16 @@ void Compiler::visit_tensor_literal_expr(TensorLiteralExpr *expr) {
         element->accept(*this);
     }
 
-    emit(std::to_underlying(Instruction::OP_BUILD_TENSOR));
-    emit(static_cast<std::uint8_t>(expr->shape.size()));
+    emit(std::to_underlying(Instruction::OP_BUILD_TENSOR), SourceLocation{});
+    emit(static_cast<std::uint8_t>(expr->shape.size()), SourceLocation{});
 
     for (const auto &dimension : expr->shape) {
-        emit(static_cast<std::uint8_t>(dimension));
+        emit(static_cast<std::uint8_t>(dimension), SourceLocation{});
     }
 }
 
-void Compiler::emit(const std::uint8_t &byte) const {
-    code_buffer->update(byte);
+void Compiler::emit(const std::uint8_t &byte, const SourceLocation &location) const {
+    code_buffer->update(byte, location);
 }
 
 int Compiler::resolve_local_variable(const Token &name) const {

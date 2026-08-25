@@ -31,7 +31,7 @@ namespace tame::backend {
 
         int scope_depth{0};
 
-        void emit(const std::uint8_t &byte) const;
+        void emit(const std::uint8_t &byte, const SourceLocation &location) const;
         [[nodiscard]] int resolve_local_variable(const frontend::Token &name) const;
     };
 }

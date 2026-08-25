@@ -20,7 +20,7 @@ namespace {
 
 TEST_F(CompilerTest, EmitsBasicPrint) {
     std::vector<std::unique_ptr<Stmt>> statements;
-    statements.push_back(std::move(std::make_unique<PrintStmt>(std::make_unique<LiteralExpr>(15))));
+    statements.push_back(std::move(std::make_unique<PrintStmt>(std::make_unique<LiteralExpr>(15, Token{}))));
 
     const auto code_buffer = compile(statements);
 
@@ -34,7 +34,7 @@ TEST_F(CompilerTest, EmitsVariableDeclaration) {
     statements.push_back(std::make_unique<VarStmt>(
         Token(TokenType::IDENTIFIER_TOKEN, "kernelSize"),
         std::make_unique<IntTypeAnnotation>(),
-        std::make_unique<LiteralExpr>(42)
+        std::make_unique<LiteralExpr>(42, Token{})
     ));
     statements.push_back(std::make_unique<PrintStmt>(std::make_unique<VarExpr>(
         Token(TokenType::IDENTIFIER_TOKEN, "kernelSize")
@@ -53,12 +53,12 @@ TEST_F(CompilerTest, EmitsTensorDeclaration) {
     std::vector<int> tensor_shape{2, 3};
 
     std::vector<std::unique_ptr<Expr>> tensor_data;
-    tensor_data.push_back(std::make_unique<LiteralExpr>(1));
-    tensor_data.push_back(std::make_unique<LiteralExpr>(2));
-    tensor_data.push_back(std::make_unique<LiteralExpr>(3));
-    tensor_data.push_back(std::make_unique<LiteralExpr>(4));
-    tensor_data.push_back(std::make_unique<LiteralExpr>(5));
-    tensor_data.push_back(std::make_unique<LiteralExpr>(6));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(1, Token{}));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(2, Token{}));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(3, Token{}));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(4, Token{}));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(5, Token{}));
+    tensor_data.push_back(std::make_unique<LiteralExpr>(6, Token{}));
 
     std::vector<std::unique_ptr<Stmt>> statements;
     statements.push_back(std::make_unique<VarStmt>(

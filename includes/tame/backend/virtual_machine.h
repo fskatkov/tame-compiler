@@ -13,7 +13,7 @@ namespace tame::backend {
         diagnostics::DiagnosticEngine &diagnostic_engine;
 
         std::unique_ptr<CodeBuffer> code_buffer_;
-        const std::uint8_t *address = nullptr;
+        std::uint8_t *address = nullptr;
 
         std::vector<frontend::Value> vm_stack;
         std::unordered_map<std::string, frontend::Value> vm_variables;
@@ -37,6 +37,7 @@ namespace tame::backend {
         VirtualMachineResult execute_instruction();
 
         inline VirtualMachineResult execute_constant();
+        inline VirtualMachineResult execute_tensor();
 
         inline VirtualMachineResult execute_addition();
         inline VirtualMachineResult execute_subtraction();

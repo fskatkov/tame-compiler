@@ -119,7 +119,7 @@ std::unique_ptr<Expr> Parser::parse_factor_expression() {
 
 std::unique_ptr<Expr> Parser::parse_primary_expression() {
     if (match({ TokenType::NIL_TOKEN })) {
-        return std::make_unique<LiteralExpr>(NIL{});
+        return std::make_unique<LiteralExpr>(NIL{}, previous());
     }
 
     if (match({ TokenType::IDENTIFIER_TOKEN })) {
@@ -127,7 +127,7 @@ std::unique_ptr<Expr> Parser::parse_primary_expression() {
     }
 
     if (match({ TokenType::INT_TOKEN, TokenType::FLOAT_TOKEN, TokenType::STRING_TOKEN })) {
-        return std::make_unique<LiteralExpr>(previous().literal);
+        return std::make_unique<LiteralExpr>(previous().literal, previous());
     }
 
     if (match({ TokenType::LEFT_BRACKET_TOKEN })) {
