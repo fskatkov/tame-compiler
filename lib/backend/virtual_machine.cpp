@@ -66,13 +66,12 @@ const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispat
     table[std::to_underlying(Instruction::OP_MUL)] = &VirtualMachine::execute_multiplication;
     table[std::to_underlying(Instruction::OP_DIV)] = &VirtualMachine::execute_division;
 
-    // table[std::to_underlying(Instruction::OP_DEFINE_VARIABLE)] = &VirtualMachine::execute_define_global_variable;
-    // table[std::to_underlying(Instruction::OP_BUILD_TENSOR)] = &VirtualMachine::execute_build_tensor;
-    //
-    // table[std::to_underlying(Instruction::OP_GET_GLOBAL)] = &VirtualMachine::execute_get_global_variable;
-    // table[std::to_underlying(Instruction::OP_SET_GLOBAL)] = &VirtualMachine::execute_set_global_variable;
-    // table[std::to_underlying(Instruction::OP_GET_LOCAL)] = &VirtualMachine::execute_get_local_variable;
-    // table[std::to_underlying(Instruction::OP_SET_LOCAL)] = &VirtualMachine::execute_set_local_variable;
+    table[std::to_underlying(Instruction::OP_DEFINE_VARIABLE)] = &VirtualMachine::execute_define_global_variable;
+
+    table[std::to_underlying(Instruction::OP_GET_GLOBAL)] = &VirtualMachine::execute_get_global_variable;
+    table[std::to_underlying(Instruction::OP_SET_GLOBAL)] = &VirtualMachine::execute_set_global_variable;
+    table[std::to_underlying(Instruction::OP_GET_LOCAL)] = &VirtualMachine::execute_get_local_variable;
+    table[std::to_underlying(Instruction::OP_SET_LOCAL)] = &VirtualMachine::execute_set_local_variable;
 
     table[std::to_underlying(Instruction::OP_POP)] = &VirtualMachine::execute_pop;
     table[std::to_underlying(Instruction::OP_PRINT)] = &VirtualMachine::execute_print;
@@ -152,6 +151,49 @@ inline VirtualMachineResult VirtualMachine::execute_division() {
             return VirtualMachineResult::RUNTIME_ERROR;
         }
     );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_define_global_variable() {
+    const auto variable_name = read_constant().get<std::shared_ptr<std::string>>();
+    vm_variables.insert_or_assign(*variable_name, peek(0));
+    pop();
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_get_global_variable() {
+    const auto variable_name = read_constant().get<std::shared_ptr<std::string>>();
+
+    if (const auto it = vm_variables.find(*variable_name); it != vm_variables.end()) {
+        push(it->second);
+    } else {
+        return VirtualMachineResult::RUNTIME_ERROR;
+    }
+
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_set_global_variable() {
+    const auto variable_name = read_constant().get<std::shared_ptr<std::string>>();
+
+    if (const auto it = vm_variables.find(*variable_name); it != vm_variables.end()) {
+        vm_variables.insert_or_assign(*variable_name, peek(0));
+    } else {
+        return VirtualMachineResult::RUNTIME_ERROR;
+    }
+
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_get_local_variable() {
+    const auto local_variable_index = read_byte();
+    push(vm_stack[local_variable_index]);
+    return VirtualMachineResult::OK;
+}
+
+inline VirtualMachineResult VirtualMachine::execute_set_local_variable() {
+    const auto local_variable_index = read_byte();
+    vm_stack[local_variable_index] = peek(0);
+    return VirtualMachineResult::OK;
 }
 
 inline VirtualMachineResult VirtualMachine::execute_pop() {

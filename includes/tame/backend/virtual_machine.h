@@ -38,12 +38,11 @@ namespace tame::backend {
         inline VirtualMachineResult execute_multiplication();
         inline VirtualMachineResult execute_division();
 
-        // inline VirtualMachineResult execute_define_global_variable();
-        // inline VirtualMachineResult execute_build_tensor();
-        // inline VirtualMachineResult execute_get_global_variable();
-        // inline VirtualMachineResult execute_set_global_variable();
-        // inline VirtualMachineResult execute_get_local_variable();
-        // inline VirtualMachineResult execute_set_local_variable();
+        inline VirtualMachineResult execute_define_global_variable();
+        inline VirtualMachineResult execute_get_global_variable();
+        inline VirtualMachineResult execute_set_global_variable();
+        inline VirtualMachineResult execute_get_local_variable();
+        inline VirtualMachineResult execute_set_local_variable();
 
         inline VirtualMachineResult execute_pop();
         inline VirtualMachineResult execute_print();
