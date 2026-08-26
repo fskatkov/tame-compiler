@@ -3,6 +3,7 @@
 #include "tame/support/common.h"
 #include "tame/support/diagnostic_engine.h"
 #include "tame/structures/code_buffer.h"
+#include "tame/backend/metal/metal_engine.h"
 
 namespace tame::backend {
     class VirtualMachine {
@@ -10,6 +11,8 @@ namespace tame::backend {
         explicit VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine);
         VirtualMachineResult execute(std::unique_ptr<CodeBuffer> code_buffer);
     private:
+        MetalEngine metal_engine;
+
         diagnostics::DiagnosticEngine &diagnostic_engine;
 
         std::unique_ptr<CodeBuffer> code_buffer_;

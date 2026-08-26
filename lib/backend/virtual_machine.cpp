@@ -216,6 +216,27 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
             push(first_operand * second_operand);
             return VirtualMachineResult::OK;
         },
+        [&](const TensorPtr &first_tensor, const TensorPtr &second_tensor) {
+            const auto M = first_tensor->tensor_shape[0];
+            const auto N = second_tensor->tensor_shape[1];
+            const auto K = first_tensor->tensor_shape[1];
+
+            if (first_tensor->tensor_shape[1] != second_tensor->tensor_shape[0]) {
+                report_error("");
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+
+            const auto resulting_tensor = std::make_shared<TensorStructure>();
+            resulting_tensor->tensor_shape = {M, N};
+            resulting_tensor->tensor_data = metal_engine.dispatch_matmul(
+                get<std::vector<float>>(first_tensor->tensor_data),
+                get<std::vector<float>>(second_tensor->tensor_data),
+                M, N, K
+            );
+
+            push(resulting_tensor);
+            return VirtualMachineResult::OK;
+        },
         [&](const float &first_operand, const float &second_operand) {
             push(first_operand * second_operand);
             return VirtualMachineResult::RUNTIME_ERROR;

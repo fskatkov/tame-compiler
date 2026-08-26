@@ -11,10 +11,9 @@ public:
     explicit MetalEngine();
     ~MetalEngine();
 
-    template<typename T>
-    std::vector<T> dispatch_matmul(
-        const std::vector<T> &lhs,
-        const std::vector<T> &rhs,
+    std::vector<float> dispatch_matmul(
+        const std::vector<float> &lhs,
+        const std::vector<float> &rhs,
         uint M, uint N, uint K
     );
 private:
