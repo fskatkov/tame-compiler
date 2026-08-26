@@ -6,7 +6,7 @@ add_library(backend STATIC
 
 target_include_directories(backend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../includes)
 
-target_link_libraries(backend PUBLIC ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK} ${QUARTZCORE_FRAMEWORK})
+target_link_libraries(backend PUBLIC metal-cpp)
 
 target_compile_options(backend PRIVATE -Wno-elaborated-enum-base)
 
