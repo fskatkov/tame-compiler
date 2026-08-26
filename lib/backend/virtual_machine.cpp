@@ -222,17 +222,30 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
             const auto K = first_tensor->tensor_shape[1];
 
             if (first_tensor->tensor_shape[1] != second_tensor->tensor_shape[0]) {
-                report_error("");
+                report_error("tensor dimension mismatch");
                 return VirtualMachineResult::RUNTIME_ERROR;
             }
 
             const auto resulting_tensor = std::make_shared<TensorStructure>();
             resulting_tensor->tensor_shape = {M, N};
-            resulting_tensor->tensor_data = metal_engine.dispatch_matmul(
-                get<std::vector<float>>(first_tensor->tensor_data),
-                get<std::vector<float>>(second_tensor->tensor_data),
-                M, N, K
-            );
+
+            bool tensor_element_type_mismatch{false};
+
+            std::visit([&](const auto &lhs, const auto &rhs) {
+                using lhs_type = typename std::decay_t<decltype(lhs)>::value_type;
+                using rhs_type = typename std::decay_t<decltype(rhs)>::value_type;
+
+                if constexpr (std::is_same_v<lhs_type, rhs_type>) {
+                    resulting_tensor->tensor_data = metal_engine.dispatch_matmul<lhs_type>(lhs, rhs, M, N, K);
+                } else {
+                    tensor_element_type_mismatch = true;
+                }
+            }, first_tensor->tensor_data, second_tensor->tensor_data);
+
+            if (tensor_element_type_mismatch) {
+                report_error("impossible to multiply tensors of different element types");
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
 
             push(resulting_tensor);
             return VirtualMachineResult::OK;
