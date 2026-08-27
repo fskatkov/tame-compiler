@@ -99,6 +99,19 @@ void Compiler::visit_tensor_literal_expr(TensorLiteralExpr *expr) {
     }
 }
 
+void Compiler::visit_gpu_launch_expr(GPULaunchExpr *expr) {
+    code_buffer->add(std::make_shared<std::string>(expr->source));
+    emit(std::to_underlying(Instruction::OP_CONSTANT), SourceLocation{});
+    emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1), SourceLocation{});
+
+    for (const auto &value : expr->values) {
+        value->accept(*this);
+    }
+
+    emit(std::to_underlying(Instruction::OP_EXECUTE_GPU), SourceLocation{});
+    emit(static_cast<std::uint8_t>(expr->values.size()), SourceLocation{});
+}
+
 void Compiler::emit(const std::uint8_t &byte, const SourceLocation &location) const {
     code_buffer->update(byte, location);
 }

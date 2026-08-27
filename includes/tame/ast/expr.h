@@ -8,6 +8,7 @@ namespace tame::ast {
     struct BinaryExpr;
     struct LiteralExpr;
     struct TensorLiteralExpr;
+    struct GPULaunchExpr;
 
     struct ExprVisitor {
         virtual ~ExprVisitor() = default;
@@ -17,6 +18,7 @@ namespace tame::ast {
         virtual void visit_binary_expr(BinaryExpr *expr) = 0;
         virtual void visit_literal_expr(LiteralExpr *expr) = 0;
         virtual void visit_tensor_literal_expr(TensorLiteralExpr *expr) = 0;
+        virtual void visit_gpu_launch_expr(GPULaunchExpr *expr) = 0;
     };
 
     struct Expr {
@@ -82,6 +84,18 @@ namespace tame::ast {
 
         void accept(ExprVisitor &visitor) override {
             visitor.visit_tensor_literal_expr(this);
+        }
+    };
+
+    struct GPULaunchExpr : public Expr {
+        std::string source;
+        std::vector<std::unique_ptr<Expr>> values;
+
+        explicit GPULaunchExpr(std::string source, std::vector<std::unique_ptr<Expr>> values)
+            : source(std::move(source)), values(std::move(values)) {  }
+
+        void accept(ExprVisitor &visitor) override {
+            visitor.visit_gpu_launch_expr(this);
         }
     };
 }

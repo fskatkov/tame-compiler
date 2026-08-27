@@ -53,6 +53,8 @@ enum class Instruction : std::uint8_t {
     OP_GET_LOCAL, OP_SET_LOCAL,
     OP_GET_GLOBAL, OP_SET_GLOBAL,
 
+    OP_EXECUTE_GPU,
+
     OP_POP, OP_RETURN,
 
     OP_PRINT

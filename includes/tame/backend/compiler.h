@@ -24,6 +24,7 @@ namespace tame::backend {
         void visit_binary_expr(ast::BinaryExpr *expr) override;
         void visit_literal_expr(ast::LiteralExpr *expr) override;
         void visit_tensor_literal_expr(ast::TensorLiteralExpr *expr) override;
+        void visit_gpu_launch_expr(ast::GPULaunchExpr *expr) override;
     private:
         std::unique_ptr<CodeBuffer> code_buffer;
 
