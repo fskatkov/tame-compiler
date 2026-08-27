@@ -47,6 +47,8 @@ namespace tame::backend {
         inline VirtualMachineResult execute_multiplication();
         inline VirtualMachineResult execute_division();
 
+        inline VirtualMachineResult execute_gpu_kernel();
+
         inline VirtualMachineResult execute_define_global_variable();
         inline VirtualMachineResult execute_get_global_variable();
         inline VirtualMachineResult execute_set_global_variable();

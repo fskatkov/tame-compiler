@@ -12,6 +12,13 @@ public:
     ~MetalEngine();
 
     template<typename T>
+    std::vector<T> dispatch(
+        const std::string &source,
+        const std::vector<const std::vector<T> *> &values,
+        const std::size_t elements_quantity
+    );
+
+    template<typename T>
     std::vector<T> dispatch_matmul(
         const std::vector<T> &lhs,
         const std::vector<T> &rhs,

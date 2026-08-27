@@ -93,6 +93,8 @@ const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispat
     table[std::to_underlying(Instruction::OP_GET_LOCAL)] = &VirtualMachine::execute_get_local_variable;
     table[std::to_underlying(Instruction::OP_SET_LOCAL)] = &VirtualMachine::execute_set_local_variable;
 
+    table[std::to_underlying(Instruction::OP_EXECUTE_GPU)] = &VirtualMachine::execute_gpu_kernel;
+
     table[std::to_underlying(Instruction::OP_POP)] = &VirtualMachine::execute_pop;
     table[std::to_underlying(Instruction::OP_PRINT)] = &VirtualMachine::execute_print;
     table[std::to_underlying(Instruction::OP_RETURN)] = &VirtualMachine::execute_return;
@@ -141,9 +143,7 @@ inline VirtualMachineResult VirtualMachine::execute_tensor() {
         return VirtualMachineResult::OK;
     }
 
-    const auto initial_element = pop();
-
-    if (initial_element.is<float>()) {
+    if (const auto initial_element = pop(); initial_element.is<float>()) {
         std::vector<float> tensor_data(elements_quantity);
         tensor_data.back() = initial_element.get<float>();
 
@@ -192,7 +192,7 @@ inline VirtualMachineResult VirtualMachine::execute_addition() {
         },
         [&](const float &first_operand, const float &second_operand) {
             push(first_operand + second_operand);
-            return VirtualMachineResult::RUNTIME_ERROR;
+            return VirtualMachineResult::OK;
         }
     );
 }
@@ -205,7 +205,7 @@ inline VirtualMachineResult VirtualMachine::execute_subtraction() {
         },
         [&](const float &first_operand, const float &second_operand) {
             push(first_operand - second_operand);
-            return VirtualMachineResult::RUNTIME_ERROR;
+            return VirtualMachineResult::OK;
         }
     );
 }
@@ -213,6 +213,10 @@ inline VirtualMachineResult VirtualMachine::execute_subtraction() {
 inline VirtualMachineResult VirtualMachine::execute_multiplication() {
     return execute_operation("*",
         [&](const int &first_operand, const int &second_operand) {
+            push(first_operand * second_operand);
+            return VirtualMachineResult::OK;
+        },
+        [&](const float &first_operand, const float &second_operand) {
             push(first_operand * second_operand);
             return VirtualMachineResult::OK;
         },
@@ -232,8 +236,8 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
             bool tensor_element_type_mismatch{false};
 
             std::visit([&](const auto &lhs, const auto &rhs) {
-                using lhs_type = typename std::decay_t<decltype(lhs)>::value_type;
-                using rhs_type = typename std::decay_t<decltype(rhs)>::value_type;
+                using lhs_type = std::decay_t<decltype(lhs)>::value_type;
+                using rhs_type = std::decay_t<decltype(rhs)>::value_type;
 
                 if constexpr (std::is_same_v<lhs_type, rhs_type>) {
                     resulting_tensor->tensor_data = metal_engine.dispatch_matmul<lhs_type>(lhs, rhs, M, N, K);
@@ -249,10 +253,6 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
 
             push(resulting_tensor);
             return VirtualMachineResult::OK;
-        },
-        [&](const float &first_operand, const float &second_operand) {
-            push(first_operand * second_operand);
-            return VirtualMachineResult::RUNTIME_ERROR;
         }
     );
 }
@@ -265,9 +265,71 @@ inline VirtualMachineResult VirtualMachine::execute_division() {
         },
         [&](const float &first_operand, const float &second_operand) {
             push(first_operand / second_operand);
-            return VirtualMachineResult::RUNTIME_ERROR;
+            return VirtualMachineResult::OK;
         }
     );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
+    const auto quantity = read_byte();
+
+    if (quantity == 0) {
+        report_error("not enough tensors to execute");
+        return VirtualMachineResult::RUNTIME_ERROR;
+    }
+
+    std::vector<TensorPtr> retained_tensors(quantity);
+    for (int i = quantity - 1; i >= 0; --i) {
+        const auto value = pop();
+
+        if (!value.is<TensorPtr>()) {
+            report_error(std::format("expected tensor<>, but got {}", value.get_type()));
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+
+        retained_tensors[i] = value.get<TensorPtr>();
+    }
+
+    const auto source_code = pop().get<std::shared_ptr<std::string>>();
+
+    const auto tensor_shape = retained_tensors.front()->tensor_shape;
+
+    return std::visit([&](const auto &first_tensor) {
+        using element_type = std::decay_t<decltype(first_tensor)>::value_type;
+
+        std::vector<const std::vector<element_type> *> input_tensors;
+        input_tensors.reserve(quantity);
+
+        const std::size_t elements_quantity = first_tensor.size();
+
+        for (std::size_t i = 0; i < quantity; ++i) {
+            if (!std::holds_alternative<std::vector<element_type>>(retained_tensors[i]->tensor_data)) {
+                report_error("tensor element type mismatch");
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+
+            const auto &tensor = std::get<std::vector<element_type>>(retained_tensors[i]->tensor_data);
+            if (tensor.size() != elements_quantity) {
+                report_error("tensor dimension mismatch");
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+
+            input_tensors.push_back(&tensor);
+        }
+
+        auto resulting_data = metal_engine.dispatch<element_type>(*source_code, input_tensors, elements_quantity);
+        if (resulting_data.empty() && elements_quantity > 0) {
+            report_error("tensor op execution failed");
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+
+        const auto resulting_tensor = std::make_shared<TensorStructure>();
+        resulting_tensor->tensor_shape = tensor_shape;
+        resulting_tensor->tensor_data = std::move(resulting_data);
+
+        push(resulting_tensor);
+        return VirtualMachineResult::OK;
+    }, retained_tensors.front()->tensor_data);
 }
 
 inline VirtualMachineResult VirtualMachine::execute_define_global_variable() {

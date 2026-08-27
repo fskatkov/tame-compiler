@@ -19,7 +19,7 @@ KernelResult MSLCodeGenerator::generate(std::unique_ptr<Expr> expr, std::string_
     }
 
     const auto output_index = values.size();
-    kernel_builder << "    device float* resulting_tensor [[buffer(" << output_index << ")]],\n";
+    kernel_builder << "    device " << dtype << "* resulting_tensor [[buffer(" << output_index << ")]],\n";
     kernel_builder << "    constant uint& total_elements [[buffer(" << output_index + 1 << ")]],\n";
     kernel_builder << "    uint id [[thread_position_in_grid]]\n";
     kernel_builder << ") {\n";
