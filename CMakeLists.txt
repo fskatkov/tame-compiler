@@ -12,7 +12,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(metal_cpp)
 
 add_library(metal-cpp INTERFACE
-        includes/tame/backend/metal/msl_codegen.h)
+        includes/tame/backend/metal/msl_codegen.h
+        includes/tame/backend/metal/lowering_engine.h)
 target_include_directories(metal-cpp INTERFACE ${metal_cpp_SOURCE_DIR})
 
 target_link_libraries(metal-cpp INTERFACE
