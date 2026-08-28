@@ -3,7 +3,9 @@ add_executable(tame_compiler_tests
     frontend_tests/parser_tests.cpp
     backend_tests/compiler_tests.cpp
     backend_tests/virtual_machine_tests.cpp
-        backend_tests/msl_codegen_tests.cpp
+    backend_tests/metal_backend_tests/metal_engine_tests.cpp
+    backend_tests/metal_backend_tests/msl_codegen_tests.cpp
+        backend_tests/metal_backend_tests/lowering_engine_tests.cpp
 )
 
 target_link_libraries(tame_compiler_tests PRIVATE
