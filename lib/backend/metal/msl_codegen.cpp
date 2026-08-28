@@ -3,7 +3,7 @@
 using namespace tame::ast;
 using namespace tame::backend;
 
-KernelResult MSLCodeGenerator::generate(std::unique_ptr<Expr> expr, std::string_view dtype) {
+KernelResult MSLCodeGenerator::generate(std::unique_ptr<Expr> expr) {
     values.clear();
     variables.clear();
 
@@ -15,11 +15,11 @@ KernelResult MSLCodeGenerator::generate(std::unique_ptr<Expr> expr, std::string_
     kernel_builder << "kernel void tensor_op(\n";
 
     for (std::size_t i = 0; i < values.size(); ++i) {
-        kernel_builder << "    device const " << dtype << "* buffer_" << i << " [[buffer(" << i << ")]],\n";
+        kernel_builder << "    device const DTYPE* buffer_" << i << " [[buffer(" << i << ")]],\n";
     }
 
     const auto output_index = values.size();
-    kernel_builder << "    device " << dtype << "* resulting_tensor [[buffer(" << output_index << ")]],\n";
+    kernel_builder << "    device DTYPE* resulting_tensor [[buffer(" << output_index << ")]],\n";
     kernel_builder << "    constant uint& total_elements [[buffer(" << output_index + 1 << ")]],\n";
     kernel_builder << "    uint id [[thread_position_in_grid]]\n";
     kernel_builder << ") {\n";

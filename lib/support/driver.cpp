@@ -22,6 +22,9 @@ int tame::DriverEngine::execute() {
         frontend::Parser parser(diagnostic_engine);
         auto statements = parser.run(tokens);
 
+        backend::LoweringEngine lowering_engine;
+        lowering_engine.process(statements);
+
         backend::Compiler compiler;
         auto code_buffer = compiler.run(statements);
 

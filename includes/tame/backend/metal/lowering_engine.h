@@ -8,7 +8,7 @@ namespace tame::backend {
     public:
         void process(std::vector<std::unique_ptr<ast::Stmt>> &statements);
     private:
-        void lower_statement(std::unique_ptr<ast::Stmt> &statement);
-        std::unique_ptr<ast::Expr> lower_expression(std::unique_ptr<ast::Expr> &expression);
+        static void lower_statement(const std::unique_ptr<ast::Stmt> &statement);
+        static std::unique_ptr<ast::Expr> lower_expression(std::unique_ptr<ast::Expr> expression);
     };
 }

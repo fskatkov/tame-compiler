@@ -10,7 +10,7 @@ namespace tame::backend {
 
     class MSLCodeGenerator {
     public:
-        KernelResult generate(std::unique_ptr<ast::Expr> expr, std::string_view dtype = "float");
+        KernelResult generate(std::unique_ptr<ast::Expr> expr);
     private:
         std::vector<std::unique_ptr<ast::Expr>> values;
         std::unordered_map<std::string_view, std::size_t> variables;

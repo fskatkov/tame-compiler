@@ -51,14 +51,21 @@ std::vector<T> MetalEngine::dispatch(
         return {};
     }
 
+    std::string source_with_predefined_type;
+    if constexpr (std::is_same_v<T, float>) {
+        source_with_predefined_type = "typedef float DTYPE;\n\n" + source;
+    } else if constexpr (std::is_same_v<T, int>) {
+        source_with_predefined_type = "typedef int DTYPE;\n\n" + source;
+    }
+
     MTL::ComputePipelineState *pipeline_state = nullptr;
 
-    if (const auto it = pipeline_cache.find(source); it != pipeline_cache.end()) {
+    if (const auto it = pipeline_cache.find(source_with_predefined_type); it != pipeline_cache.end()) {
         pipeline_state = it->second;
     } else {
         NS::Error *dynamic_library_error = nullptr;
         MTL::Library *dynamic_library = device->newLibrary(
-            NS::String::string(source.c_str(), NS::UTF8StringEncoding),
+            NS::String::string(source_with_predefined_type.c_str(), NS::UTF8StringEncoding),
             MTL::CompileOptions::alloc()->init(),
             &dynamic_library_error
         );
@@ -68,20 +75,22 @@ std::vector<T> MetalEngine::dispatch(
             return {};
         }
 
-        const MTL::Function *dynamic_function = dynamic_library->newFunction(
+        MTL::Function *dynamic_function = dynamic_library->newFunction(
             NS::String::string("tensor_op", NS::UTF8StringEncoding)
         );
-        pipeline_state = device->newComputePipelineState(dynamic_function, &dynamic_library_error);
 
         dynamic_library->release();
-        pipeline_state->release();
+
+        pipeline_state = device->newComputePipelineState(dynamic_function, &dynamic_library_error);
+
+        dynamic_function->release();
 
         if (!pipeline_state) {
             std::println(stderr, "pipeline fail: {}\n", dynamic_library_error->localizedDescription()->utf8String());
             return {};
         }
 
-        pipeline_cache[source] = pipeline_state;
+        pipeline_cache[source_with_predefined_type] = pipeline_state;
     }
 
     const std::size_t data_size = elements_quantity * sizeof(T);
