@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <span>
 #include <unordered_map>
+#include <numeric>
 
 template<class... Ts>
 struct overloaded : Ts... {

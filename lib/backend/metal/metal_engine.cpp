@@ -4,6 +4,8 @@
 
 #include "tame/backend/metal/metal_engine.h"
 
+using namespace tame::backend;
+
 MetalEngine::MetalEngine() {
     device = MTL::CreateSystemDefaultDevice();
     if (!device) {

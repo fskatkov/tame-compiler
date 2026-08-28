@@ -14,9 +14,22 @@ using namespace tame::diagnostics;
 namespace {
     class VirtualMachineTest : public ::testing::Test {
     protected:
-        static std::unique_ptr<CodeBuffer> compile(const std::vector<std::unique_ptr<Stmt>> &statements) {
+        DiagnosticEngine diagnostic_engine;
+        VirtualMachine virtual_machine{diagnostic_engine};
+
+        VirtualMachineResult execute(const std::vector<std::unique_ptr<Stmt>> &statements) {
             Compiler compiler;
-            return compiler.run(statements);
+            return virtual_machine.execute(std::move(compiler.run(statements)));
+        }
+
+        static std::unique_ptr<TensorLiteralExpr> define_tensor(const std::vector<float> &values) {
+            std::vector<std::unique_ptr<Expr>> tensor_data;
+            tensor_data.reserve(values.size());
+
+            for (const auto &value : values) {
+                tensor_data.push_back(std::make_unique<LiteralExpr>(value, Token{}));
+            }
+            return std::make_unique<TensorLiteralExpr>(std::vector<int>{2, 3}, std::move(tensor_data));
         }
     };
 }
@@ -32,12 +45,9 @@ TEST_F(VirtualMachineTest, ComputeBasicTwoOperandsAddtion) {
         )
     ));
 
-    DiagnosticEngine diagnostic_engine;
-    VirtualMachine virtual_machine(diagnostic_engine);
-
     testing::internal::CaptureStdout();
 
-    const auto vm_execution_result = virtual_machine.execute(std::move(compile(statements)));
+    const auto vm_execution_result = execute(statements);
 
     const std::string vm_output = testing::internal::GetCapturedStdout();
 
@@ -68,12 +78,9 @@ TEST_F(VirtualMachineTest, ComputeVariableDeclarations) {
         )
     ));
 
-    DiagnosticEngine diagnostic_engine;
-    VirtualMachine virtual_machine(diagnostic_engine);
-
     testing::internal::CaptureStdout();
 
-    const auto vm_execution_result = virtual_machine.execute(std::move(compile(statements)));
+    const auto vm_execution_result = execute(statements);
 
     const std::string vm_output = testing::internal::GetCapturedStdout();
 
@@ -102,15 +109,10 @@ TEST_F(VirtualMachineTest, ComputeTensorDeclaration) {
         Token(TokenType::IDENTIFIER_TOKEN, "randomMatrix")
     )));
 
-    DiagnosticEngine diagnostic_engine;
-    VirtualMachine virtual_machine(diagnostic_engine);
-
     testing::internal::CaptureStdout();
 
-    const auto vm_execution_result = virtual_machine.execute(std::move(compile(statements)));
-
+    const auto vm_execution_result = execute(statements);
     const std::string vm_output = testing::internal::GetCapturedStdout();
 
     EXPECT_EQ(vm_execution_result, VirtualMachineResult::OK) << "VM executed with runtime-errors!";
 }
-
