@@ -11,7 +11,21 @@ namespace tame::frontend {
         using TensorStorage = std::variant<std::vector<float>, std::vector<int>>;
 
         std::vector<int> tensor_shape;
+        std::vector<uint64_t> strides;
+        std::size_t byte_offset{0};
         TensorStorage tensor_data;
+
+        void set_strides() {
+            if (tensor_shape.empty()) {
+                strides.clear();
+                return;
+            }
+
+            strides.assign(tensor_shape.size(), 1);
+            for (int i = static_cast<int>(tensor_shape.size()) - 2; i >= 0; --i) {
+                strides[i] = strides[i + 1] * static_cast<uint64_t>(tensor_shape[i + 1]);
+            }
+        }
 
         [[nodiscard]] std::string get_shape() const {
             if (tensor_shape.empty()) return "tensor<>";
@@ -29,11 +43,6 @@ namespace tame::frontend {
 
                 if (tensor_shape.empty() || data.empty()) {
                     return std::format("tensor([], dtype={})\n", data_type);
-                }
-
-                std::vector<std::size_t> strides(tensor_shape.size(), 1);
-                for (int i = static_cast<int>(tensor_shape.size()) - 2; i >= 0; --i) {
-                    strides[i] = strides[i + 1] * tensor_shape[i + 1];
                 }
 
                 std::string resulting_tensor = "tensor(";
@@ -70,14 +79,14 @@ namespace tame::frontend {
                                 }
                             }
 
-                            self(depth + 1, offset + i * strides[depth], indent + 1);
+                            self(depth + 1, offset + i * (strides.empty() ? 1 : strides[depth]), indent + 1);
                         }
                     }
 
                     resulting_tensor += ']';
                 };
 
-                format_tensor_dimension(0, 0, 7);
+                format_tensor_dimension(0, byte_offset, 7);
 
                 auto stringified_shape = tensor_shape | std::views::transform([](auto elem) {
                                              return std::to_string(elem);
