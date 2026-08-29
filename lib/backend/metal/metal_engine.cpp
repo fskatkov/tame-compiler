@@ -4,12 +4,14 @@
 
 #include "tame/backend/metal/metal_engine.h"
 
+using namespace tame::frontend;
 using namespace tame::backend;
 
 MetalEngine::MetalEngine() {
     device = MTL::CreateSystemDefaultDevice();
     if (!device) {
-        throw std::runtime_error("failed to initialize Metal device");
+        std::println(stderr, "failed to initialize Metal device\n");
+        return;
     }
 
     command_queue = device->newCommandQueue();
@@ -43,22 +45,18 @@ MetalEngine::~MetalEngine() {
     device->release();
 }
 
-template<typename T>
-std::vector<T> MetalEngine::dispatch(
+MTL::Buffer *MetalEngine::dispatch(
     const std::string &source,
-    const std::vector<const std::vector<T> *> &values,
-    const std::size_t elements_quantity
+    const std::span<MTL::Buffer *const> buffers,
+    const std::size_t elements_quantity,
+    const TensorDataType data_type
 ) {
-    if (elements_quantity == 0) {
-        return {};
-    }
+    if (elements_quantity == 0) { return {}; }
 
-    std::string source_with_predefined_type;
-    if constexpr (std::is_same_v<T, float>) {
-        source_with_predefined_type = "typedef float DTYPE;\n\n" + source;
-    } else if constexpr (std::is_same_v<T, int>) {
-        source_with_predefined_type = "typedef int DTYPE;\n\n" + source;
-    }
+    const std::string source_with_predefined_type = (data_type == TensorDataType::Float32
+        ? "typedef float DTYPE;\n\n"
+        : "typedef int DTYPE;\n\n"
+    ) + source;
 
     MTL::ComputePipelineState *pipeline_state = nullptr;
 
@@ -82,9 +80,7 @@ std::vector<T> MetalEngine::dispatch(
         );
 
         dynamic_library->release();
-
         pipeline_state = device->newComputePipelineState(dynamic_function, &dynamic_library_error);
-
         dynamic_function->release();
 
         if (!pipeline_state) {
@@ -95,16 +91,11 @@ std::vector<T> MetalEngine::dispatch(
         pipeline_cache[source_with_predefined_type] = pipeline_state;
     }
 
-    const std::size_t data_size = elements_quantity * sizeof(T);
+    const std::size_t data_size = elements_quantity * (data_type == TensorDataType::Float32
+                                                           ? sizeof(float)
+                                                           : sizeof(int));
 
-    std::vector<MTL::Buffer *> buffers;
-    buffers.reserve(values.size());
-
-    for (const auto *value : values) {
-        buffers.push_back(device->newBuffer(value->data(), data_size, MTL::ResourceStorageModeShared));
-    }
-
-    auto *resulting_buffer = device->newBuffer(data_size, MTL::ResourceStorageModeShared);
+    auto *resulting_buffer = allocate_buffer(data_size);
     auto *command_buffer = command_queue->commandBuffer();
     auto *compute_encoder = command_buffer->computeCommandEncoder();
 
@@ -130,45 +121,23 @@ std::vector<T> MetalEngine::dispatch(
     command_buffer->commit();
     command_buffer->waitUntilCompleted();
 
-    std::vector<T> resulting_tensor(elements_quantity);
-    std::memcpy(resulting_tensor.data(), resulting_buffer->contents(), data_size);
-
-    for (auto *buffer : buffers) {
-        buffer->release();
-    }
-    resulting_buffer->release();
-
-    return resulting_tensor;
+    return resulting_buffer;
 }
 
-template std::vector<float> MetalEngine::dispatch(
-    const std::string &source,
-    const std::vector<const std::vector<float> *> &values,
-    const std::size_t elements_quantity
-);
-
-template std::vector<int> MetalEngine::dispatch(
-    const std::string &source,
-    const std::vector<const std::vector<int> *> &values,
-    const std::size_t elements_quantity
-);
-
-template<typename T>
-std::vector<T> MetalEngine::dispatch_matmul(const std::vector<T> &lhs, const std::vector<T> &rhs, uint M, uint N, uint K) {
-    const std::size_t lhs_size = lhs.size() * sizeof(T);
-    const std::size_t rhs_size = rhs.size() * sizeof(T);
-    const std::size_t resulting_size = M * N * sizeof(T);
-
-    auto *lhs_buffer = device->newBuffer(lhs.data(), lhs_size, MTL::ResourceStorageModeShared);
-    auto *rhs_buffer = device->newBuffer(rhs.data(), rhs_size, MTL::ResourceStorageModeShared);
-    auto *resulting_buffer = device->newBuffer(resulting_size, MTL::ResourceStorageModeShared);
-
+MTL::Buffer *MetalEngine::dispatch_matmul(
+    const MTL::Buffer *lhs_buffer,
+    const MTL::Buffer *rhs_buffer,
+    const uint M, const uint N, const uint K,
+    const TensorDataType data_type
+) const {
+    const std::size_t data_size = M * N * (data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int));
+    auto *resulting_buffer = allocate_buffer(data_size);
     auto *command_buffer = command_queue->commandBuffer();
     auto *compute_encoder = command_buffer->computeCommandEncoder();
 
-    if constexpr (std::is_same_v<T, float>) {
+    if (data_type == TensorDataType::Float32) {
         compute_encoder->setComputePipelineState(matmul_f32_pipeline_state);
-    } else if constexpr (std::is_same_v<T, int>) {
+    } else {
         compute_encoder->setComputePipelineState(matmul_i32_pipeline_state);
     }
 
@@ -186,24 +155,5 @@ std::vector<T> MetalEngine::dispatch_matmul(const std::vector<T> &lhs, const std
     command_buffer->commit();
     command_buffer->waitUntilCompleted();
 
-    std::vector<T> resulting_tensor(M * N);
-    std::memcpy(resulting_tensor.data(), resulting_buffer->contents(), resulting_size);
-
-    lhs_buffer->release();
-    rhs_buffer->release();
-    resulting_buffer->release();
-
-    return resulting_tensor;
+    return resulting_buffer;
 }
-
-template std::vector<float> MetalEngine::dispatch_matmul<float>(
-    const std::vector<float> &lhs,
-    const std::vector<float> &rhs,
-    uint M, uint N, uint K
-);
-
-template std::vector<int> MetalEngine::dispatch_matmul<int>(
-    const std::vector<int> &lhs,
-    const std::vector<int> &rhs,
-    uint M, uint N, uint K
-);

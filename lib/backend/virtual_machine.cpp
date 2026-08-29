@@ -136,16 +136,24 @@ inline VirtualMachineResult VirtualMachine::execute_tensor() {
 
     const auto tensor = std::make_shared<TensorStructure>();
     tensor->tensor_shape = std::move(tensor_shape);
+    tensor->set_strides();
 
     if (elements_quantity == 0) {
-        tensor->tensor_data = std::vector<float>{};
+        tensor->buffer = nullptr;
         push(tensor);
         return VirtualMachineResult::OK;
     }
 
-    if (const auto initial_element = pop(); initial_element.is<float>()) {
-        std::vector<float> tensor_data(elements_quantity);
-        tensor_data.back() = initial_element.get<float>();
+    const auto initial_element = pop();
+    const auto data_type = initial_element.is<float>() ? TensorDataType::Float32 : TensorDataType::Int32;
+    const std::size_t byte_size = elements_quantity * (data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int));
+
+    tensor->data_type = data_type;
+    tensor->buffer = metal_engine.allocate_buffer(byte_size);
+
+    if (data_type == TensorDataType::Float32) {
+        auto *tensor_data = static_cast<float *>(tensor->buffer->contents());
+        tensor_data[elements_quantity - 1] = initial_element.get<float>();
 
         for (int i = elements_quantity - 2; i >= 0; --i) {
             const auto element = pop();
@@ -157,11 +165,9 @@ inline VirtualMachineResult VirtualMachine::execute_tensor() {
 
             tensor_data[i] = element.get<float>();
         }
-
-        tensor->tensor_data = std::move(tensor_data);
-    } else if (initial_element.is<int>()) {
-        std::vector<int> tensor_data(elements_quantity);
-        tensor_data.back() = initial_element.get<int>();
+    } else {
+        auto *tensor_data = static_cast<int *>(tensor->buffer->contents());
+        tensor_data[elements_quantity - 1] = initial_element.get<int>();
 
         for (int i = elements_quantity - 2; i >= 0; --i) {
             const auto element = pop();
@@ -173,11 +179,6 @@ inline VirtualMachineResult VirtualMachine::execute_tensor() {
 
             tensor_data[i] = element.get<int>();
         }
-
-        tensor->tensor_data = std::move(tensor_data);
-    } else {
-        report_error(std::format("unsupported tensor element type: {}", initial_element.get_type()));
-        return VirtualMachineResult::RUNTIME_ERROR;
     }
 
     push(tensor);
@@ -230,26 +231,18 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
                 return VirtualMachineResult::RUNTIME_ERROR;
             }
 
-            const auto resulting_tensor = std::make_shared<TensorStructure>();
-            resulting_tensor->tensor_shape = {M, N};
-
-            bool tensor_element_type_mismatch{false};
-
-            std::visit([&](const auto &lhs, const auto &rhs) {
-                using lhs_type = std::decay_t<decltype(lhs)>::value_type;
-                using rhs_type = std::decay_t<decltype(rhs)>::value_type;
-
-                if constexpr (std::is_same_v<lhs_type, rhs_type>) {
-                    resulting_tensor->tensor_data = metal_engine.dispatch_matmul<lhs_type>(lhs, rhs, M, N, K);
-                } else {
-                    tensor_element_type_mismatch = true;
-                }
-            }, first_tensor->tensor_data, second_tensor->tensor_data);
-
-            if (tensor_element_type_mismatch) {
+            if (first_tensor->data_type != second_tensor->data_type) {
                 report_error("impossible to multiply tensors of different element types");
                 return VirtualMachineResult::RUNTIME_ERROR;
             }
+
+            const auto resulting_tensor = std::make_shared<TensorStructure>();
+            resulting_tensor->tensor_shape = {M, N};
+            resulting_tensor->set_strides();
+            resulting_tensor->data_type = first_tensor->data_type;
+            resulting_tensor->buffer = metal_engine.dispatch_matmul(
+                first_tensor->buffer, second_tensor->buffer, M, N, K, first_tensor->data_type
+            );
 
             push(resulting_tensor);
             return VirtualMachineResult::OK;
@@ -293,43 +286,47 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
     const auto source_code = pop().get<std::shared_ptr<std::string>>();
 
     const auto tensor_shape = retained_tensors.front()->tensor_shape;
+    const auto data_type = retained_tensors.front()->data_type;
+    const std::size_t element_size = data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int);
+    const std::size_t elements_quantity = retained_tensors.front()->buffer
+                                              ? retained_tensors.front()->buffer->length() / element_size
+                                              : 0;
 
-    return std::visit([&](const auto &first_tensor) {
-        using element_type = std::decay_t<decltype(first_tensor)>::value_type;
+    std::vector<MTL::Buffer *> input_buffers;
+    input_buffers.reserve(quantity);
 
-        std::vector<const std::vector<element_type> *> input_tensors;
-        input_tensors.reserve(quantity);
-
-        const std::size_t elements_quantity = first_tensor.size();
-
-        for (std::size_t i = 0; i < quantity; ++i) {
-            if (!std::holds_alternative<std::vector<element_type>>(retained_tensors[i]->tensor_data)) {
-                report_error("tensor element type mismatch");
-                return VirtualMachineResult::RUNTIME_ERROR;
-            }
-
-            const auto &tensor = std::get<std::vector<element_type>>(retained_tensors[i]->tensor_data);
-            if (tensor.size() != elements_quantity) {
-                report_error("tensor dimension mismatch");
-                return VirtualMachineResult::RUNTIME_ERROR;
-            }
-
-            input_tensors.push_back(&tensor);
-        }
-
-        auto resulting_data = metal_engine.dispatch<element_type>(*source_code, input_tensors, elements_quantity);
-        if (resulting_data.empty() && elements_quantity > 0) {
-            report_error("tensor op execution failed");
+    for (std::size_t i = 0; i < quantity; ++i) {
+        if (retained_tensors[i]->data_type != data_type) {
+            report_error("tensor element type mismatch");
             return VirtualMachineResult::RUNTIME_ERROR;
         }
 
-        const auto resulting_tensor = std::make_shared<TensorStructure>();
-        resulting_tensor->tensor_shape = tensor_shape;
-        resulting_tensor->tensor_data = std::move(resulting_data);
+        const std::size_t current_elements = retained_tensors[i]->buffer
+                                                 ? retained_tensors[i]->buffer->length() / element_size
+                                                 : 0;
 
-        push(resulting_tensor);
-        return VirtualMachineResult::OK;
-    }, retained_tensors.front()->tensor_data);
+        if (current_elements != elements_quantity) {
+            report_error("tensor dimension mismatch");
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+
+        input_buffers.push_back(retained_tensors[i]->buffer);
+    }
+
+    const auto resulting_buffer = metal_engine.dispatch(*source_code, input_buffers, elements_quantity, data_type);
+    if (!resulting_buffer && elements_quantity > 0) {
+        report_error("tensor op execution failed");
+        return VirtualMachineResult::RUNTIME_ERROR;
+    }
+
+    const auto resulting_tensor = std::make_shared<TensorStructure>();
+    resulting_tensor->tensor_shape = tensor_shape;
+    resulting_tensor->set_strides();
+    resulting_tensor->data_type = data_type;
+    resulting_tensor->buffer = resulting_buffer;
+
+    push(resulting_tensor);
+    return VirtualMachineResult::OK;
 }
 
 inline VirtualMachineResult VirtualMachine::execute_define_global_variable() {

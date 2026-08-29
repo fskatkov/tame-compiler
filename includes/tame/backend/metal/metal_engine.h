@@ -5,6 +5,7 @@
 #include <QuartzCore/QuartzCore.hpp>
 
 #include "tame/support/common.h"
+#include "tame/structures/value.h"
 
 namespace tame::backend {
     class MetalEngine {
@@ -12,19 +13,23 @@ namespace tame::backend {
         explicit MetalEngine();
         ~MetalEngine();
 
-        template<typename T>
-        std::vector<T> dispatch(
+        MTL::Buffer *dispatch(
             const std::string &source,
-            const std::vector<const std::vector<T> *> &values,
-            const std::size_t elements_quantity
+            std::span<MTL::Buffer *const> buffers,
+            std::size_t elements_quantity,
+            frontend::TensorDataType data_type
         );
 
-        template<typename T>
-        std::vector<T> dispatch_matmul(
-            const std::vector<T> &lhs,
-            const std::vector<T> &rhs,
-            uint M, uint N, uint K
-        );
+        MTL::Buffer *dispatch_matmul(
+            const MTL::Buffer *lhs_buffer,
+            const MTL::Buffer *rhs_buffer,
+            uint M, uint N, uint K,
+            frontend::TensorDataType data_type
+        ) const;
+
+        [[nodiscard]] MTL::Buffer *allocate_buffer(std::size_t size_bytes) const {
+            return device->newBuffer(size_bytes, MTL::ResourceStorageModeShared);
+        }
     private:
         MTL::Device *device;
         MTL::CommandQueue *command_queue;
