@@ -16,6 +16,7 @@
 #include <span>
 #include <unordered_map>
 #include <numeric>
+#include <bit>
 
 template<class... Ts>
 struct overloaded : Ts... {

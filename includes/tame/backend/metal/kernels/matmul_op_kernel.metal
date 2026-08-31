@@ -2,8 +2,6 @@
 
 using namespace metal;
 
-constant uint TILE_SIZE = 32;
-
 template<typename T>
 void matmul_op(
     device const T *lhs_tensor,
@@ -14,34 +12,39 @@ void matmul_op(
     constant uint &K,
     uint2 grid_id,
     uint2 local_id,
-    threadgroup T lhs_tensor_tile[TILE_SIZE][TILE_SIZE],
-    threadgroup T rhs_tensor_tile[TILE_SIZE][TILE_SIZE]
+    uint2 threadgroup_size,
+    threadgroup T *shared_memory
 ) {
     uint row = grid_id.y;
     uint col = grid_id.x;
 
+    uint TILE_DIMENSION = threadgroup_size.x;
+
+    threadgroup T* lhs_tensor_tile = shared_memory;
+    threadgroup T* rhs_tensor_tile = shared_memory + (TILE_DIMENSION * TILE_DIMENSION);
+
     T sum = T(0);
-    uint tiles_quantity = (K + TILE_SIZE - 1) / TILE_SIZE;
+    uint tiles_quantity = (K + TILE_DIMENSION - 1) / TILE_DIMENSION;
 
     for (uint t = 0; t < tiles_quantity; ++t) {
-         uint tiled_k = t * TILE_SIZE + local_id.x;
-         if (row < M && tiled_k < K) {
-            lhs_tensor_tile[local_id.y][local_id.x] = lhs_tensor[row * K + tiled_k];
+         uint tiled_k_lhs = t * TILE_DIMENSION + local_id.x;
+         if (row < M && tiled_k_lhs < K) {
+            lhs_tensor_tile[local_id.y * TILE_DIMENSION + local_id.x] = lhs_tensor[row * K + tiled_k_lhs];
          } else {
-            lhs_tensor_tile[local_id.y][local_id.x] = 0.0;
+            lhs_tensor_tile[local_id.y * TILE_DIMENSION + local_id.x] = T(0);
          }
 
-         tiled_k = t * TILE_SIZE + local_id.y;
-         if (tiled_k < K && col < N) {
-            rhs_tensor_tile[local_id.y][local_id.x] = rhs_tensor[tiled_k * N + col];
+        uint tiled_k_rhs = t * TILE_DIMENSION + local_id.y;
+         if (tiled_k_rhs < K && col < N) {
+            rhs_tensor_tile[local_id.y * TILE_DIMENSION + local_id.x] = rhs_tensor[tiled_k_rhs * N + col];
          } else {
-            rhs_tensor_tile[local_id.y][local_id.x] = 0.0;
+            rhs_tensor_tile[local_id.y * TILE_DIMENSION + local_id.x] = T(0);
          }
 
          threadgroup_barrier(mem_flags::mem_threadgroup);
 
-         for (uint i = 0; i < TILE_SIZE; ++i) {
-            sum += lhs_tensor_tile[local_id.y][i] * rhs_tensor_tile[i][local_id.x];
+         for (uint i = 0; i < TILE_DIMENSION; ++i) {
+            sum += lhs_tensor_tile[local_id.y * TILE_DIMENSION + i] * rhs_tensor_tile[i * TILE_DIMENSION + local_id.x];
          }
 
          threadgroup_barrier(mem_flags::mem_threadgroup);
@@ -60,12 +63,11 @@ kernel void matmul_op_f32(
     constant uint &N [[buffer(4)]],
     constant uint &K [[buffer(5)]],
     uint2 grid_id [[thread_position_in_grid]],
-    uint2 local_id [[thread_position_in_threadgroup]]
+    uint2 local_id [[thread_position_in_threadgroup]],
+    uint2 threadgroup_size [[threads_per_threadgroup]],
+    threadgroup float *shared_memory [[threadgroup(0)]]
 ) {
-    threadgroup float lhs_tile[TILE_SIZE][TILE_SIZE];
-    threadgroup float rhs_tile[TILE_SIZE][TILE_SIZE];
-
-    matmul_op<float>(lhs, rhs, resulting_tensor, M, N, K, grid_id, local_id, lhs_tile, rhs_tile);
+    matmul_op<float>(lhs, rhs, resulting_tensor, M, N, K, grid_id, local_id, threadgroup_size, shared_memory);
 }
 
 kernel void matmul_op_i32(
@@ -76,10 +78,9 @@ kernel void matmul_op_i32(
     constant uint &N [[buffer(4)]],
     constant uint &K [[buffer(5)]],
     uint2 grid_id [[thread_position_in_grid]],
-    uint2 local_id [[thread_position_in_threadgroup]]
+    uint2 local_id [[thread_position_in_threadgroup]],
+    uint2 threadgroup_size [[threads_per_threadgroup]],
+    threadgroup int *shared_memory [[threadgroup(0)]]
 ) {
-    threadgroup int lhs_tile[TILE_SIZE][TILE_SIZE];
-    threadgroup int rhs_tile[TILE_SIZE][TILE_SIZE];
-
-    matmul_op<int>(lhs, rhs, resulting_tensor, M, N, K, grid_id, local_id, lhs_tile, rhs_tile);
+    matmul_op<int>(lhs, rhs, resulting_tensor, M, N, K, grid_id, local_id, threadgroup_size, shared_memory);
 }

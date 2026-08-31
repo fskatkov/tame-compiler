@@ -175,11 +175,8 @@ MTL::Buffer *MetalEngine::dispatch_matmul(
     auto *command_buffer = command_queue->commandBuffer();
     auto *compute_encoder = command_buffer->computeCommandEncoder();
 
-    if (data_type == TensorDataType::Float32) {
-        compute_encoder->setComputePipelineState(matmul_f32_pipeline_state);
-    } else {
-        compute_encoder->setComputePipelineState(matmul_i32_pipeline_state);
-    }
+    auto *pipeline_state = data_type == TensorDataType::Float32 ? matmul_f32_pipeline_state : matmul_i32_pipeline_state;
+    compute_encoder->setComputePipelineState(pipeline_state);
 
     compute_encoder->setBuffer(lhs_buffer, 0, 0);
     compute_encoder->setBuffer(rhs_buffer, 0, 1);
@@ -189,7 +186,25 @@ MTL::Buffer *MetalEngine::dispatch_matmul(
     compute_encoder->setBytes(&N, sizeof(uint), 4);
     compute_encoder->setBytes(&K, sizeof(uint), 5);
 
-    compute_encoder->dispatchThreads(MTL::Size(N, M, 1), MTL::Size(32, 32, 1));
+    const NS::UInteger max_threads = pipeline_state->maxTotalThreadsPerThreadgroup();
+    const NS::UInteger simd_width = pipeline_state->threadExecutionWidth();
+
+    const NS::UInteger tile_dimension = std::min<NS::UInteger>(
+        std::bit_floor(static_cast<NS::UInteger>(std::sqrt(max_threads))),
+        simd_width
+    );
+
+    MTL::Size threadgroup_size(tile_dimension, tile_dimension, 1);
+    MTL::Size grid_size(
+        (N + tile_dimension - 1) / tile_dimension * tile_dimension,
+        (M + tile_dimension - 1) / tile_dimension * tile_dimension,
+        1
+    );
+
+    const NS::UInteger element_size = data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int);
+    compute_encoder->setThreadgroupMemoryLength(2 * (tile_dimension * tile_dimension) * element_size, 0);
+
+    compute_encoder->dispatchThreads(grid_size, threadgroup_size);
     compute_encoder->endEncoding();
 
     command_buffer->commit();
