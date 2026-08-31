@@ -2,6 +2,7 @@
 
 #include "tame/structures/code_buffer.h"
 #include "tame/ast/stmt.h"
+#include "metal/metal_engine.h"
 
 namespace tame::backend {
     struct LocalVariable {
@@ -11,7 +12,7 @@ namespace tame::backend {
 
     class Compiler : public ast::ExprVisitor, public ast::StmtVisitor {
     public:
-        explicit Compiler();
+        explicit Compiler(MetalEngine &metal_engine);
 
         std::unique_ptr<CodeBuffer> run(const std::vector<std::unique_ptr<ast::Stmt>> &statements);
 
@@ -26,6 +27,8 @@ namespace tame::backend {
         void visit_tensor_literal_expr(ast::TensorLiteralExpr *expr) override;
         void visit_gpu_launch_expr(ast::GPULaunchExpr *expr) override;
     private:
+        MetalEngine &metal_engine;
+
         std::unique_ptr<CodeBuffer> code_buffer;
 
         std::vector<LocalVariable> local_variables;

@@ -4,7 +4,8 @@ using namespace tame::frontend;
 using namespace tame::ast;
 using namespace tame::backend;
 
-Compiler::Compiler() : code_buffer(std::make_unique<CodeBuffer>()) {  }
+Compiler::Compiler(MetalEngine &metal_engine)
+    : metal_engine(metal_engine), code_buffer(std::make_unique<CodeBuffer>()) {  }
 
 std::unique_ptr<CodeBuffer> Compiler::run(const std::vector<std::unique_ptr<Stmt>> &statements) {
     for (const auto &statement : statements) {
@@ -130,7 +131,9 @@ void Compiler::visit_tensor_literal_expr(TensorLiteralExpr *expr) {
 }
 
 void Compiler::visit_gpu_launch_expr(GPULaunchExpr *expr) {
-    code_buffer->add(std::make_shared<std::string>(expr->source));
+    const auto pipeline_id = metal_engine.compile_kernel(expr->source);
+    code_buffer->add(static_cast<int>(pipeline_id));
+
     emit(std::to_underlying(Instruction::OP_CONSTANT), SourceLocation{});
     emit(static_cast<std::uint8_t>(code_buffer->values.size() - 1), SourceLocation{});
 

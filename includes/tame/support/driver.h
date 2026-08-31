@@ -6,6 +6,7 @@
 #include "tame/backend/metal/lowering_engine.h"
 #include "tame/backend/compiler.h"
 #include "tame/backend/virtual_machine.h"
+#include "tame/backend/metal/metal_engine.h"
 
 namespace tame {
     class DriverEngine {

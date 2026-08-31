@@ -3,7 +3,8 @@
 using namespace tame::frontend;
 using namespace tame::backend;
 
-VirtualMachine::VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine) : diagnostic_engine(diagnostic_engine) {
+VirtualMachine::VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine, MetalEngine &metal_engine)
+    : metal_engine(metal_engine), diagnostic_engine(diagnostic_engine) {
     vm_stack.reserve(256);
 }
 
@@ -256,8 +257,7 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
         retained_tensors[i] = value.get<TensorPtr>();
     }
 
-    const auto source_code = pop().get<std::shared_ptr<std::string>>();
-
+    const auto pipeline_id = static_cast<std::size_t>(pop().get<int>());
     const auto tensor_shape = retained_tensors.front()->tensor_shape;
     const auto data_type = retained_tensors.front()->data_type;
     const std::size_t element_size = data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int);
@@ -286,7 +286,8 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
         input_buffers.push_back(retained_tensors[i]->buffer);
     }
 
-    const auto resulting_buffer = metal_engine.dispatch(*source_code, input_buffers, elements_quantity, data_type);
+    const auto resulting_buffer = metal_engine.dispatch(pipeline_id, input_buffers, elements_quantity, data_type);
+
     if (!resulting_buffer && elements_quantity > 0) {
         report_error("tensor op execution failed");
         return VirtualMachineResult::RUNTIME_ERROR;

@@ -70,28 +70,14 @@ MetalEngine::~MetalEngine() {
     device->release();
 }
 
-MTL::Buffer *MetalEngine::dispatch(
-    const std::string &source,
-    const std::span<MTL::Buffer *const> buffers,
-    const std::size_t elements_quantity,
-    const TensorDataType data_type
-) {
-    if (elements_quantity == 0) { return nullptr; }
+std::size_t MetalEngine::compile_kernel(std::string_view source) {
+    auto compile = [this, source](std::string_view data_type) -> MTL::ComputePipelineState* {
+        const std::string source_with_predefined_type = std::format("typedef {} DTYPE;\n\n{}", data_type, source);
 
-    const std::string source_with_predefined_type = std::format(
-        "typedef {} DTYPE;\n\n{}",
-        data_type == TensorDataType::Float32 ? "float" : "int",
-        source
-    );
-
-    MTL::ComputePipelineState *pipeline_state = nullptr;
-
-    if (const auto it = pipeline_cache.find(source_with_predefined_type); it != pipeline_cache.end()) {
-        pipeline_state = it->second;
-    } else {
-        NS::Error *dynamic_library_error = nullptr;
         MTL::CompileOptions *compile_options = MTL::CompileOptions::alloc()->init();
+        compile_options->setFastMathEnabled(true);
 
+        NS::Error *dynamic_library_error{nullptr};
         MTL::Library *dynamic_library = device->newLibrary(
             NS::String::string(source_with_predefined_type.c_str(), NS::UTF8StringEncoding),
             compile_options,
@@ -110,16 +96,42 @@ MTL::Buffer *MetalEngine::dispatch(
         );
 
         dynamic_library->release();
-        pipeline_state = device->newComputePipelineState(dynamic_function, &dynamic_library_error);
+
+        MTL::ComputePipelineState *pipeline_state = device->newComputePipelineState(
+            dynamic_function,
+            &dynamic_library_error
+        );
+
         dynamic_function->release();
 
-        if (!pipeline_state) {
-            std::println(stderr, "pipeline fail: {}\n", dynamic_library_error->localizedDescription()->utf8String());
-            return nullptr;
-        }
+        return pipeline_state;
+    };
 
-        pipeline_cache[source_with_predefined_type] = pipeline_state;
+    const std::size_t pipeline_id = precompiled_kernels.size();
+
+    precompiled_kernels.push_back({
+        .float32_pipeline_state = compile("float"),
+        .int32_pipeline_state = compile("int")
+    });
+
+    return pipeline_id;
+}
+
+MTL::Buffer *MetalEngine::dispatch(
+    const std::size_t pipeline_id,
+    const std::span<MTL::Buffer *const> buffers,
+    const std::size_t elements_quantity,
+    const TensorDataType data_type
+) const {
+    if (elements_quantity == 0) {
+        return nullptr;
     }
+
+    const auto &kernel_pipeline_pair = precompiled_kernels[pipeline_id];
+
+    const auto *pipeline_state = data_type == TensorDataType::Float32
+                                                    ? kernel_pipeline_pair.float32_pipeline_state
+                                                    : kernel_pipeline_pair.int32_pipeline_state;
 
     const std::size_t data_size = elements_quantity * (data_type == TensorDataType::Float32
                                                            ? sizeof(float)
@@ -140,12 +152,9 @@ MTL::Buffer *MetalEngine::dispatch(
     const auto elements_quantity_uint = static_cast<uint>(elements_quantity);
     compute_encoder->setBytes(&elements_quantity_uint, sizeof(uint), buffer_index);
 
-    auto thread_group_size = pipeline_state->maxTotalThreadsPerThreadgroup();
-    if (thread_group_size > elements_quantity) {
-        thread_group_size = elements_quantity;
-    }
+    const auto thread_group_size = std::min<uint>(pipeline_state->maxTotalThreadsPerThreadgroup(), elements_quantity_uint);
 
-    compute_encoder->dispatchThreads(MTL::Size(elements_quantity, 1, 1), MTL::Size(thread_group_size, 1, 1));
+    compute_encoder->dispatchThreads(MTL::Size(elements_quantity_uint, 1, 1), MTL::Size(thread_group_size, 1, 1));
     compute_encoder->endEncoding();
 
     command_buffer->commit();

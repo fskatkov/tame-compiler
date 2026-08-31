@@ -8,10 +8,10 @@
 namespace tame::backend {
     class VirtualMachine {
     public:
-        explicit VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine);
+        explicit VirtualMachine(diagnostics::DiagnosticEngine &diagnostic_engine, MetalEngine &metal_engine);
         VirtualMachineResult execute(std::unique_ptr<CodeBuffer> code_buffer);
     private:
-        MetalEngine metal_engine;
+        MetalEngine &metal_engine;
 
         diagnostics::DiagnosticEngine &diagnostic_engine;
 

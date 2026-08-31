@@ -1,10 +1,14 @@
 #include "tame/support/driver.h"
 
+using namespace tame::frontend;
+using namespace tame::backend;
 using namespace tame::diagnostics;
 
 int tame::DriverEngine::execute() {
     DiagnosticEngine diagnostic_engine;
-    backend::VirtualMachine virtual_machine(diagnostic_engine);
+    MetalEngine metal_engine;
+
+    VirtualMachine virtual_machine(diagnostic_engine, metal_engine);
 
     while (true) {
         std::cout << "> " << std::flush;
@@ -16,16 +20,16 @@ int tame::DriverEngine::execute() {
 
         diagnostic_engine.init(user_input);
 
-        frontend::Lexer lexer(diagnostic_engine);
+        Lexer lexer(diagnostic_engine);
         auto tokens = lexer.tokenize(user_input);
 
-        frontend::Parser parser(diagnostic_engine);
+        Parser parser(diagnostic_engine);
         auto statements = parser.run(tokens);
 
-        backend::LoweringEngine lowering_engine;
+        LoweringEngine lowering_engine;
         lowering_engine.process(statements);
 
-        backend::Compiler compiler;
+        Compiler compiler(metal_engine);
         auto code_buffer = compiler.run(statements);
 
         virtual_machine.execute(std::move(code_buffer));

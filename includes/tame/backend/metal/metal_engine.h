@@ -8,17 +8,24 @@
 #include "tame/structures/value.h"
 
 namespace tame::backend {
+    struct KernelPipelinePair {
+        MTL::ComputePipelineState *float32_pipeline_state{nullptr};
+        MTL::ComputePipelineState *int32_pipeline_state{nullptr};
+    };
+
     class MetalEngine {
     public:
         explicit MetalEngine();
         ~MetalEngine();
 
+        [[nodiscard]] std::size_t compile_kernel(std::string_view source);
+
         MTL::Buffer *dispatch(
-            const std::string &source,
+            std::size_t pipeline_id,
             std::span<MTL::Buffer *const> buffers,
             std::size_t elements_quantity,
             frontend::TensorDataType data_type
-        );
+        ) const;
 
         MTL::Buffer *dispatch_matmul(
             const MTL::Buffer *lhs_buffer,
@@ -41,6 +48,9 @@ namespace tame::backend {
 
         MTL::ComputePipelineState *matmul_i32_pipeline_state;
         MTL::ComputePipelineState *matmul_f32_pipeline_state;
+
+        std::vector<KernelPipelinePair> precompiled_kernels;
+
         std::unordered_map<std::string, MTL::ComputePipelineState *> pipeline_cache;
     };
 }
