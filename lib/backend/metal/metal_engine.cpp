@@ -16,6 +16,22 @@ MetalEngine::MetalEngine() {
 
     command_queue = device->newCommandQueue();
 
+    MTL::HeapDescriptor *heap_descriptor = MTL::HeapDescriptor::alloc()->init();
+    heap_descriptor->setSize(256 * 1024 * 1024);
+    heap_descriptor->setStorageMode(MTL::StorageModeShared);
+    heap_descriptor->setType(MTL::HeapTypeAutomatic);
+
+    buffer_heap = device->newHeap(heap_descriptor);
+
+    heap_descriptor->release();
+
+    if (!buffer_heap) {
+        command_queue->release();
+        device->release();
+        std::println(stderr, "failed to allocate Metal heap\n");
+        return;
+    }
+
     NS::Error *library_initialization_error = nullptr;
     MTL::Library *general_library = device->newLibrary(
         NS::String::string("general.metallib", NS::UTF8StringEncoding),
@@ -23,6 +39,9 @@ MetalEngine::MetalEngine() {
     );
 
     if (!general_library) {
+        buffer_heap->release();
+        command_queue->release();
+        device->release();
         std::println(stderr, "{}\n", library_initialization_error->localizedDescription()->utf8String());
         return;
     }
@@ -39,8 +58,14 @@ MetalEngine::MetalEngine() {
 }
 
 MetalEngine::~MetalEngine() {
+    for (auto &[_, pipeline] : pipeline_cache) {
+        pipeline->release();
+    }
+    pipeline_cache.clear();
+
     matmul_f32_pipeline_state->release();
     matmul_i32_pipeline_state->release();
+    buffer_heap->release();
     command_queue->release();
     device->release();
 }
@@ -51,12 +76,13 @@ MTL::Buffer *MetalEngine::dispatch(
     const std::size_t elements_quantity,
     const TensorDataType data_type
 ) {
-    if (elements_quantity == 0) { return {}; }
+    if (elements_quantity == 0) { return nullptr; }
 
-    const std::string source_with_predefined_type = (data_type == TensorDataType::Float32
-        ? "typedef float DTYPE;\n\n"
-        : "typedef int DTYPE;\n\n"
-    ) + source;
+    const std::string source_with_predefined_type = std::format(
+        "typedef {} DTYPE;\n\n{}",
+        data_type == TensorDataType::Float32 ? "float" : "int",
+        source
+    );
 
     MTL::ComputePipelineState *pipeline_state = nullptr;
 
@@ -64,15 +90,19 @@ MTL::Buffer *MetalEngine::dispatch(
         pipeline_state = it->second;
     } else {
         NS::Error *dynamic_library_error = nullptr;
+        MTL::CompileOptions *compile_options = MTL::CompileOptions::alloc()->init();
+
         MTL::Library *dynamic_library = device->newLibrary(
             NS::String::string(source_with_predefined_type.c_str(), NS::UTF8StringEncoding),
-            MTL::CompileOptions::alloc()->init(),
+            compile_options,
             &dynamic_library_error
         );
 
+        compile_options->release();
+
         if (!dynamic_library) {
             std::println(stderr, "error: {}\n", dynamic_library_error->localizedDescription()->utf8String());
-            return {};
+            return nullptr;
         }
 
         MTL::Function *dynamic_function = dynamic_library->newFunction(
@@ -85,7 +115,7 @@ MTL::Buffer *MetalEngine::dispatch(
 
         if (!pipeline_state) {
             std::println(stderr, "pipeline fail: {}\n", dynamic_library_error->localizedDescription()->utf8String());
-            return {};
+            return nullptr;
         }
 
         pipeline_cache[source_with_predefined_type] = pipeline_state;
@@ -131,6 +161,7 @@ MTL::Buffer *MetalEngine::dispatch_matmul(
     const TensorDataType data_type
 ) const {
     const std::size_t data_size = M * N * (data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int));
+
     auto *resulting_buffer = allocate_buffer(data_size);
     auto *command_buffer = command_queue->commandBuffer();
     auto *compute_encoder = command_buffer->computeCommandEncoder();

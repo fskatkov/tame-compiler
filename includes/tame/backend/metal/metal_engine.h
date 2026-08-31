@@ -28,11 +28,17 @@ namespace tame::backend {
         ) const;
 
         [[nodiscard]] MTL::Buffer *allocate_buffer(std::size_t size_bytes) const {
+            if (MTL::Buffer *buffer = buffer_heap->newBuffer(size_bytes, MTL::ResourceStorageModeShared)) {
+                return buffer;
+            }
+
             return device->newBuffer(size_bytes, MTL::ResourceStorageModeShared);
         }
     private:
         MTL::Device *device;
         MTL::CommandQueue *command_queue;
+        MTL::Heap *buffer_heap;
+
         MTL::ComputePipelineState *matmul_i32_pipeline_state;
         MTL::ComputePipelineState *matmul_f32_pipeline_state;
         std::unordered_map<std::string, MTL::ComputePipelineState *> pipeline_cache;

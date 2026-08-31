@@ -87,16 +87,46 @@ void Compiler::visit_literal_expr(LiteralExpr *expr) {
 }
 
 void Compiler::visit_tensor_literal_expr(TensorLiteralExpr *expr) {
-    for (const auto &element : expr->data) {
-        element->accept(*this);
+    bool is_floating_point = true;
+    if (!expr->data.empty()) {
+        if (const auto *first_literal_expr = dynamic_cast<LiteralExpr *>(expr->data.front().get())) {
+            is_floating_point = first_literal_expr->value.is<float>();
+        }
     }
 
+    const std::size_t element_size = is_floating_point ? sizeof(float) : sizeof(int);
+    const std::size_t bytes_quantity = expr->data.size() * element_size;
+    auto binary_blob_ptr = std::make_shared<std::vector<std::byte>>(bytes_quantity);
+
+    auto *destination_ptr = binary_blob_ptr->data();
+    for (const auto &element : expr->data) {
+        auto *literal_expr = dynamic_cast<LiteralExpr *>(element.get());
+        if (!literal_expr) {
+            continue;
+        }
+
+        if (is_floating_point) {
+            const float value = literal_expr->value.get<float>();
+            std::memcpy(destination_ptr, &value, sizeof(float));
+        } else {
+            const int value = literal_expr->value.get<int>();
+            std::memcpy(destination_ptr, &value, sizeof(int));
+        }
+
+        destination_ptr += element_size;
+    }
+
+    const auto blob_ptr_index = code_buffer->add(binary_blob_ptr);
+
     emit(std::to_underlying(Instruction::OP_BUILD_TENSOR), SourceLocation{});
+    emit(static_cast<std::uint8_t>(is_floating_point ? 0 : 1), SourceLocation{});
     emit(static_cast<std::uint8_t>(expr->shape.size()), SourceLocation{});
 
     for (const auto &dimension : expr->shape) {
         emit(static_cast<std::uint8_t>(dimension), SourceLocation{});
     }
+
+    emit(static_cast<std::uint8_t>(blob_ptr_index), SourceLocation{});
 }
 
 void Compiler::visit_gpu_launch_expr(GPULaunchExpr *expr) {

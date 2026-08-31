@@ -138,9 +138,10 @@ namespace tame::frontend {
 
     using TensorPtr = std::shared_ptr<TensorStructure>;
     using StringPtr = std::shared_ptr<std::string>;
+    using BlobPtr = std::shared_ptr<std::vector<std::byte>>;
 
     struct Value {
-        using ValueType = std::variant<int, float, StringPtr, TensorPtr, NIL>;
+        using ValueType = std::variant<int, float, StringPtr, TensorPtr, BlobPtr, NIL>;
         ValueType value{NIL{}};
 
         Value() = default;
@@ -170,6 +171,7 @@ namespace tame::frontend {
             [](float) { return std::string("f32"); },
             [](const StringPtr&) { return std::string("str"); },
             [](const TensorPtr &inner_value) { return inner_value->get_shape(); },
+            [](const BlobPtr &) { return std::string("blob pointer"); },
             [](NIL) { return std::string("null type"); }
         }, value);
     }
@@ -181,6 +183,7 @@ namespace tame::frontend {
             },
             [](const StringPtr &inner_value) { return *inner_value; },
             [](const TensorPtr &inner_value) { return inner_value->print(); },
+            [](const BlobPtr &) { return std::string("blob pointer"); },
             [](NIL) { return std::string("null"); }
         }, value);
     }

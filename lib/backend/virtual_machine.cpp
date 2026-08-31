@@ -124,9 +124,12 @@ inline VirtualMachineResult VirtualMachine::execute_constant() {
 }
 
 inline VirtualMachineResult VirtualMachine::execute_tensor() {
+    const auto is_floating_point = read_byte();
     const auto tensor_rank = read_byte();
 
     std::vector<int> tensor_shape;
+    tensor_shape.reserve(tensor_rank);
+
     auto elements_quantity = 1;
     for (int i = 0; i < tensor_rank; ++i) {
         const auto dimension = read_byte();
@@ -134,9 +137,12 @@ inline VirtualMachineResult VirtualMachine::execute_tensor() {
         elements_quantity *= dimension;
     }
 
+    const auto blob_ptr_index = read_byte();
+
     const auto tensor = std::make_shared<TensorStructure>();
     tensor->tensor_shape = std::move(tensor_shape);
     tensor->set_strides();
+    tensor->data_type = is_floating_point == 0 ? TensorDataType::Float32 : TensorDataType::Int32;
 
     if (elements_quantity == 0) {
         tensor->buffer = nullptr;
@@ -144,42 +150,9 @@ inline VirtualMachineResult VirtualMachine::execute_tensor() {
         return VirtualMachineResult::OK;
     }
 
-    const auto initial_element = pop();
-    const auto data_type = initial_element.is<float>() ? TensorDataType::Float32 : TensorDataType::Int32;
-    const std::size_t byte_size = elements_quantity * (data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int));
-
-    tensor->data_type = data_type;
-    tensor->buffer = metal_engine.allocate_buffer(byte_size);
-
-    if (data_type == TensorDataType::Float32) {
-        auto *tensor_data = static_cast<float *>(tensor->buffer->contents());
-        tensor_data[elements_quantity - 1] = initial_element.get<float>();
-
-        for (int i = elements_quantity - 2; i >= 0; --i) {
-            const auto element = pop();
-
-            if (!element.is<float>()) {
-                report_error(std::format("tensor type mismatch: expected f32, got {}", element.get_type()));
-                return VirtualMachineResult::RUNTIME_ERROR;
-            }
-
-            tensor_data[i] = element.get<float>();
-        }
-    } else {
-        auto *tensor_data = static_cast<int *>(tensor->buffer->contents());
-        tensor_data[elements_quantity - 1] = initial_element.get<int>();
-
-        for (int i = elements_quantity - 2; i >= 0; --i) {
-            const auto element = pop();
-
-            if (!element.is<int>()) {
-                report_error(std::format("tensor type mismatch: expected i32, got {}", element.get_type()));
-                return VirtualMachineResult::RUNTIME_ERROR;
-            }
-
-            tensor_data[i] = element.get<int>();
-        }
-    }
+    const auto &blob_ptr = code_buffer_->values.at(blob_ptr_index).get<BlobPtr>();
+    tensor->buffer = metal_engine.allocate_buffer(blob_ptr->size());
+    std::memcpy(tensor->buffer->contents(), blob_ptr->data(), blob_ptr->size());
 
     push(tensor);
     return VirtualMachineResult::OK;
