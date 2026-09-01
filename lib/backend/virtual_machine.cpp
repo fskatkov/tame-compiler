@@ -354,6 +354,7 @@ inline VirtualMachineResult VirtualMachine::execute_pop() {
 }
 
 inline VirtualMachineResult VirtualMachine::execute_print() {
+    metal_engine.synchronize_engine();
     std::cout << peek(0).get_value() << "\n";
     pop();
     return VirtualMachineResult::OK;

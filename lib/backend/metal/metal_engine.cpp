@@ -58,11 +58,7 @@ MetalEngine::MetalEngine() {
 }
 
 MetalEngine::~MetalEngine() {
-    for (auto &[_, pipeline] : pipeline_cache) {
-        pipeline->release();
-    }
-    pipeline_cache.clear();
-
+    synchronize_engine();
     matmul_f32_pipeline_state->release();
     matmul_i32_pipeline_state->release();
     buffer_heap->release();
@@ -117,12 +113,37 @@ std::size_t MetalEngine::compile_kernel(std::string_view source) {
     return pipeline_id;
 }
 
+MTL::Buffer *MetalEngine::allocate_buffer(std::size_t size_bytes) const {
+    if (MTL::Buffer *buffer = buffer_heap->newBuffer(size_bytes, MTL::ResourceStorageModeShared)) {
+        return buffer;
+    }
+
+    return device->newBuffer(size_bytes, MTL::ResourceStorageModeShared);
+}
+
+void MetalEngine::synchronize_engine() {
+    if (active_command_buffer) {
+        active_command_buffer->commit();
+        active_command_buffer->waitUntilCompleted();
+        active_command_buffer->release();
+        active_command_buffer = nullptr;
+    }
+}
+
+MTL::CommandBuffer *MetalEngine::get_active_buffer() {
+    if (!active_command_buffer) {
+        active_command_buffer = command_queue->commandBuffer()->retain();
+    }
+
+    return active_command_buffer;
+}
+
 MTL::Buffer *MetalEngine::dispatch(
     const std::size_t pipeline_id,
     const std::span<MTL::Buffer *const> buffers,
     const std::size_t elements_quantity,
     const TensorDataType data_type
-) const {
+) {
     if (elements_quantity == 0) {
         return nullptr;
     }
@@ -138,7 +159,7 @@ MTL::Buffer *MetalEngine::dispatch(
                                                            : sizeof(int));
 
     auto *resulting_buffer = allocate_buffer(data_size);
-    auto *command_buffer = command_queue->commandBuffer();
+    auto *command_buffer = get_active_buffer();
     auto *compute_encoder = command_buffer->computeCommandEncoder();
 
     compute_encoder->setComputePipelineState(pipeline_state);
@@ -157,9 +178,6 @@ MTL::Buffer *MetalEngine::dispatch(
     compute_encoder->dispatchThreads(MTL::Size(elements_quantity_uint, 1, 1), MTL::Size(thread_group_size, 1, 1));
     compute_encoder->endEncoding();
 
-    command_buffer->commit();
-    command_buffer->waitUntilCompleted();
-
     return resulting_buffer;
 }
 
@@ -168,11 +186,11 @@ MTL::Buffer *MetalEngine::dispatch_matmul(
     const MTL::Buffer *rhs_buffer,
     const uint M, const uint N, const uint K,
     const TensorDataType data_type
-) const {
+) {
     const std::size_t data_size = M * N * (data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int));
 
     auto *resulting_buffer = allocate_buffer(data_size);
-    auto *command_buffer = command_queue->commandBuffer();
+    auto *command_buffer = get_active_buffer();
     auto *compute_encoder = command_buffer->computeCommandEncoder();
 
     auto *pipeline_state = data_type == TensorDataType::Float32 ? matmul_f32_pipeline_state : matmul_i32_pipeline_state;
@@ -206,9 +224,6 @@ MTL::Buffer *MetalEngine::dispatch_matmul(
 
     compute_encoder->dispatchThreads(grid_size, threadgroup_size);
     compute_encoder->endEncoding();
-
-    command_buffer->commit();
-    command_buffer->waitUntilCompleted();
 
     return resulting_buffer;
 }
