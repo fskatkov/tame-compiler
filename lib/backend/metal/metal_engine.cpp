@@ -128,6 +128,11 @@ void MetalEngine::synchronize_engine() {
         active_command_buffer->release();
         active_command_buffer = nullptr;
     }
+
+    if (auto *synchronized_buffer = command_queue->commandBuffer()) {
+        synchronized_buffer->commit();
+        synchronized_buffer->waitUntilCompleted();
+    }
 }
 
 MTL::CommandBuffer *MetalEngine::get_active_buffer() {
@@ -199,6 +204,11 @@ MTL::Buffer *MetalEngine::dispatch(
     compute_encoder->dispatchThreads(MTL::Size(total_elements, 1, 1), MTL::Size(thread_group_size, 1, 1));
     compute_encoder->endEncoding();
 
+    command_buffer->commit();
+
+    active_command_buffer->release();
+    active_command_buffer = nullptr;
+
     return resulting_buffer;
 }
 
@@ -245,6 +255,11 @@ MTL::Buffer *MetalEngine::dispatch_matmul(
 
     compute_encoder->dispatchThreads(grid_size, threadgroup_size);
     compute_encoder->endEncoding();
+
+    command_buffer->commit();
+
+    active_command_buffer->release();
+    active_command_buffer = nullptr;
 
     return resulting_buffer;
 }

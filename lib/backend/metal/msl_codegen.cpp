@@ -85,7 +85,7 @@ std::string MSLCodeGenerator::process_node(std::unique_ptr<Expr> &expr) {
 
     if (auto *literal_expression = dynamic_cast<LiteralExpr *>(expr.get())) {
         if (literal_expression->value.is<float>()) {
-            return std::format("{}f", literal_expression->value.get<float>());
+            return std::format("{:f}f", literal_expression->value.get<float>());
         }
 
         if (literal_expression->value.is<int>()) {

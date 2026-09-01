@@ -245,38 +245,77 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
         return VirtualMachineResult::RUNTIME_ERROR;
     }
 
-    std::vector<TensorPtr> retained_tensors(quantity);
+    std::vector<Value> current_values(quantity);
     for (int i = quantity - 1; i >= 0; --i) {
-        const auto value = pop();
-
-        if (!value.is<TensorPtr>()) {
-            report_error(std::format("expected tensor<>, but got {}", value.get_type()));
-            return VirtualMachineResult::RUNTIME_ERROR;
-        }
-
-        retained_tensors[i] = value.get<TensorPtr>();
+        current_values[i] = pop();
     }
 
     const auto pipeline_id = static_cast<std::size_t>(pop().get<int>());
-    const auto tensor_shape = retained_tensors.front()->tensor_shape;
-    const auto data_type = retained_tensors.front()->data_type;
-    const std::size_t element_size = data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int);
-    const std::size_t elements_quantity = retained_tensors.front()->buffer
-                                              ? retained_tensors.front()->buffer->length() / element_size
-                                              : 0;
 
-    for (std::size_t i = 0; i < quantity; ++i) {
-        if (retained_tensors[i]->data_type != data_type) {
-            report_error("tensor element type mismatch");
-            return VirtualMachineResult::RUNTIME_ERROR;
+    std::vector<int> tensor_shape;
+    TensorDataType data_type{TensorDataType::Float32};
+    bool is_tensor{false};
+
+    for (const auto &value : current_values) {
+        if (value.is<TensorPtr>()) {
+            const auto current_tensor = value.get<TensorPtr>();
+            tensor_shape = current_tensor->tensor_shape;
+            data_type = current_tensor->data_type;
+            is_tensor = true;
+            break;
         }
+    }
 
-        const std::size_t current_elements = retained_tensors[i]->buffer
-                                                 ? retained_tensors[i]->buffer->length() / element_size
-                                                 : 0;
+    if (!is_tensor) {
+        report_error("at least one operand must be a tensor");
+        return VirtualMachineResult::RUNTIME_ERROR;
+    }
 
-        if (current_elements != elements_quantity) {
-            report_error("tensor dimension mismatch");
+    const auto tensor_rank = tensor_shape.size();
+
+    std::size_t elements_quantity{1};
+    for (const auto &dimension : tensor_shape) {
+        elements_quantity *= dimension;
+    }
+
+    const std::size_t element_size = data_type == TensorDataType::Float32 ? sizeof(float) : sizeof(int);
+
+    std::vector<TensorPtr> retained_tensors(quantity);
+    for (std::size_t i = 0; i < quantity; ++i) {
+        if (auto current_value = current_values[i]; current_value.is<TensorPtr>()) {
+            retained_tensors[i] = current_value.get<TensorPtr>();
+
+            if (retained_tensors[i]->data_type != data_type) {
+                report_error("tensor element type mismatch");
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+
+            const std::size_t current_elements = retained_tensors[i]->buffer
+                                                     ? retained_tensors[i]->buffer->length() / element_size
+                                                     : 0;
+
+            if (current_elements != elements_quantity) {
+                report_error("tensor dimension mismatch");
+                return VirtualMachineResult::RUNTIME_ERROR;
+            }
+        } else if (current_value.is<float>() || current_value.is<int>()) {
+            const auto scalar_tensor = std::make_shared<TensorStructure>();
+            scalar_tensor->tensor_shape = tensor_shape;
+            scalar_tensor->strides = std::vector<uint64_t>(tensor_rank > 0 ? tensor_rank : 1, 0);
+            scalar_tensor->data_type = data_type;
+            scalar_tensor->buffer = metal_engine.allocate_buffer(element_size);
+
+            if (data_type == TensorDataType::Float32) {
+                const float final_value = current_value.get<float>();
+                std::memcpy(scalar_tensor->buffer->contents(), &final_value, sizeof(float));
+            } else {
+                const int final_value = current_value.get<int>();
+                std::memcpy(scalar_tensor->buffer->contents(), &final_value, sizeof(int));
+            }
+
+            retained_tensors[i] = scalar_tensor;
+        } else {
+            report_error("expected tensor or scalar input");
             return VirtualMachineResult::RUNTIME_ERROR;
         }
     }
@@ -289,7 +328,7 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
     }
 
     const auto resulting_tensor = std::make_shared<TensorStructure>();
-    resulting_tensor->tensor_shape = tensor_shape;
+    resulting_tensor->tensor_shape = std::move(tensor_shape);
     resulting_tensor->set_strides();
     resulting_tensor->data_type = data_type;
     resulting_tensor->buffer = resulting_buffer;
