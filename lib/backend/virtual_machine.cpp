@@ -265,9 +265,6 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
                                               ? retained_tensors.front()->buffer->length() / element_size
                                               : 0;
 
-    std::vector<MTL::Buffer *> input_buffers;
-    input_buffers.reserve(quantity);
-
     for (std::size_t i = 0; i < quantity; ++i) {
         if (retained_tensors[i]->data_type != data_type) {
             report_error("tensor element type mismatch");
@@ -282,11 +279,9 @@ inline VirtualMachineResult VirtualMachine::execute_gpu_kernel() {
             report_error("tensor dimension mismatch");
             return VirtualMachineResult::RUNTIME_ERROR;
         }
-
-        input_buffers.push_back(retained_tensors[i]->buffer);
     }
 
-    const auto resulting_buffer = metal_engine.dispatch(pipeline_id, input_buffers, elements_quantity, data_type);
+    const auto resulting_buffer = metal_engine.dispatch(pipeline_id, retained_tensors, elements_quantity, data_type);
 
     if (!resulting_buffer && elements_quantity > 0) {
         report_error("tensor op execution failed");

@@ -140,8 +140,8 @@ MTL::CommandBuffer *MetalEngine::get_active_buffer() {
 
 MTL::Buffer *MetalEngine::dispatch(
     const std::size_t pipeline_id,
-    const std::span<MTL::Buffer *const> buffers,
-    const std::size_t elements_quantity,
+    std::span<const TensorPtr> tensors,
+    std::size_t elements_quantity,
     const TensorDataType data_type
 ) {
     if (elements_quantity == 0) {
@@ -165,17 +165,38 @@ MTL::Buffer *MetalEngine::dispatch(
     compute_encoder->setComputePipelineState(pipeline_state);
 
     std::size_t buffer_index{0};
-    for (const auto *buffer : buffers) {
-        compute_encoder->setBuffer(buffer, 0, buffer_index++);
+    for (const auto &tensor : tensors) {
+        compute_encoder->setBuffer(tensor->buffer, 0, buffer_index++);
     }
     compute_encoder->setBuffer(resulting_buffer, 0, buffer_index++);
 
-    const auto elements_quantity_uint = static_cast<uint>(elements_quantity);
-    compute_encoder->setBytes(&elements_quantity_uint, sizeof(uint), buffer_index);
+    const std::vector<uint> tensor_shape(tensors.front()->tensor_shape.begin(), tensors.front()->tensor_shape.end());
+    compute_encoder->setBytes(
+        tensor_shape.data(),
+        tensor_shape.empty() ? sizeof(uint) : tensor_shape.size() * sizeof(uint),
+        buffer_index++
+    );
 
-    const auto thread_group_size = std::min<uint>(pipeline_state->maxTotalThreadsPerThreadgroup(), elements_quantity_uint);
+    const uint tensor_rank = static_cast<uint>(tensor_shape.size());
+    compute_encoder->setBytes(&tensor_rank, sizeof(uint), buffer_index++);
 
-    compute_encoder->dispatchThreads(MTL::Size(elements_quantity_uint, 1, 1), MTL::Size(thread_group_size, 1, 1));
+    const auto total_elements = static_cast<uint>(elements_quantity);
+    compute_encoder->setBytes(&total_elements, sizeof(uint), buffer_index++);
+
+    for (const auto &tensor : tensors) {
+        compute_encoder->setBytes(
+            tensor->strides.data(),
+            tensor->strides.empty() ? sizeof(uint64_t) : tensor->strides.size() * sizeof(uint64_t),
+            buffer_index++
+        );
+
+        const std::size_t byte_offset = tensor->byte_offset;
+        compute_encoder->setBytes(&byte_offset, sizeof(std::size_t), buffer_index++);
+    }
+
+    const auto thread_group_size = std::min<uint>(pipeline_state->maxTotalThreadsPerThreadgroup(), total_elements);
+
+    compute_encoder->dispatchThreads(MTL::Size(total_elements, 1, 1), MTL::Size(thread_group_size, 1, 1));
     compute_encoder->endEncoding();
 
     return resulting_buffer;

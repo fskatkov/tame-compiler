@@ -26,7 +26,7 @@ namespace tame::backend {
 
         [[nodiscard]] MTL::Buffer *dispatch(
             std::size_t pipeline_id,
-            std::span<MTL::Buffer *const> buffers,
+            std::span<const frontend::TensorPtr> tensors,
             std::size_t elements_quantity,
             frontend::TensorDataType data_type
         );
