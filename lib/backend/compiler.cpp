@@ -75,10 +75,11 @@ void Compiler::visit_binary_expr(BinaryExpr *expr) {
     expr->rhs->accept(*this);
 
     switch (expr->operator_token.type) {
-        case TokenType::PLUS_TOKEN:  emit(std::to_underlying(Instruction::OP_ADD), SourceLocation{}); break;
-        case TokenType::MINUS_TOKEN: emit(std::to_underlying(Instruction::OP_SUB), SourceLocation{}); break;
-        case TokenType::STAR_TOKEN:  emit(std::to_underlying(Instruction::OP_MUL), SourceLocation{}); break;
-        case TokenType::SLASH_TOKEN: emit(std::to_underlying(Instruction::OP_DIV), SourceLocation{}); break;
+        case TokenType::PLUS_TOKEN:        emit(std::to_underlying(Instruction::OP_ADD), SourceLocation{}); break;
+        case TokenType::MINUS_TOKEN:       emit(std::to_underlying(Instruction::OP_SUB), SourceLocation{}); break;
+        case TokenType::STAR_TOKEN:        emit(std::to_underlying(Instruction::OP_MUL), SourceLocation{}); break;
+        case TokenType::TENSOR_MUL_TOKEN:  emit(std::to_underlying(Instruction::OP_MATMUL), SourceLocation{}); break;
+        case TokenType::SLASH_TOKEN:       emit(std::to_underlying(Instruction::OP_DIV), SourceLocation{}); break;
         default: break;
     }
 }

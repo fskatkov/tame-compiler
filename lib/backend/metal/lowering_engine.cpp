@@ -33,7 +33,7 @@ std::unique_ptr<Expr> LoweringEngine::lower_expression(std::unique_ptr<Expr> exp
     }
 
     if (auto *binary_expression = dynamic_cast<BinaryExpr *>(expression.get())) {
-        if (binary_expression->operator_token.type == TokenType::STAR_TOKEN) {
+        if (binary_expression->operator_token.type == TokenType::TENSOR_MUL_TOKEN) {
             binary_expression->lhs = lower_expression(std::move(binary_expression->lhs));
             binary_expression->rhs = lower_expression(std::move(binary_expression->rhs));
             return expression;

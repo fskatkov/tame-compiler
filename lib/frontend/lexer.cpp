@@ -42,6 +42,7 @@ void Lexer::scan_next_token() {
         case '+': add_token(TokenType::PLUS_TOKEN); break;
         case '-': add_token(TokenType::MINUS_TOKEN); break;
         case '*': add_token(TokenType::STAR_TOKEN); break;
+        case '@': add_token(TokenType::TENSOR_MUL_TOKEN); break;
         case '/': add_token(TokenType::SLASH_TOKEN); break;
         case '=': add_token(TokenType::EQUALS_TOKEN); break;
         case ' ':

@@ -104,7 +104,7 @@ std::unique_ptr<Expr> Parser::parse_term_expression() {
 std::unique_ptr<Expr> Parser::parse_factor_expression() {
     auto left_expression = parse_primary_expression();
 
-    while (match({ TokenType::STAR_TOKEN, TokenType::SLASH_TOKEN })) {
+    while (match({ TokenType::STAR_TOKEN, TokenType::TENSOR_MUL_TOKEN, TokenType::SLASH_TOKEN })) {
         const auto operator_token = previous();
         auto right_expression = parse_primary_expression();
         left_expression = std::make_unique<BinaryExpr>(

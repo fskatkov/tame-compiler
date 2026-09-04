@@ -45,6 +45,7 @@ namespace tame::backend {
         inline VirtualMachineResult execute_addition();
         inline VirtualMachineResult execute_subtraction();
         inline VirtualMachineResult execute_multiplication();
+        inline VirtualMachineResult execute_matmul();
         inline VirtualMachineResult execute_division();
 
         inline VirtualMachineResult execute_gpu_kernel();

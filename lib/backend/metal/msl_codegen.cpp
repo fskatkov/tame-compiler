@@ -74,10 +74,21 @@ std::string MSLCodeGenerator::process_node(std::unique_ptr<Expr> &expr) {
 
     if (auto *binary_expression = dynamic_cast<BinaryExpr *>(expr.get())) {
         if (binary_expression->operator_token.type == frontend::TokenType::PLUS_TOKEN
-            || binary_expression->operator_token.type == frontend::TokenType::MINUS_TOKEN) {
+            || binary_expression->operator_token.type == frontend::TokenType::MINUS_TOKEN
+            || binary_expression->operator_token.type == frontend::TokenType::STAR_TOKEN
+            || binary_expression->operator_token.type == frontend::TokenType::SLASH_TOKEN) {
+
             const auto lhs = process_node(binary_expression->lhs);
             const auto rhs = process_node(binary_expression->rhs);
-            const auto op = binary_expression->operator_token.type == frontend::TokenType::PLUS_TOKEN ? "+" : "-";
+
+            std::string op;
+            switch (binary_expression->operator_token.type) {
+                case frontend::TokenType::PLUS_TOKEN:   op = "+"; break;
+                case frontend::TokenType::MINUS_TOKEN:  op = "-"; break;
+                case frontend::TokenType::STAR_TOKEN:   op = "*"; break;
+                case frontend::TokenType::SLASH_TOKEN:  op = "/"; break;
+                default: break;
+            }
 
             return std::format("({} {} {})", lhs, op, rhs);
         }

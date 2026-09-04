@@ -85,6 +85,7 @@ const std::array<VirtualMachine::InstructionHandler, 256> VirtualMachine::dispat
     table[std::to_underlying(Instruction::OP_ADD)] = &VirtualMachine::execute_addition;
     table[std::to_underlying(Instruction::OP_SUB)] = &VirtualMachine::execute_subtraction;
     table[std::to_underlying(Instruction::OP_MUL)] = &VirtualMachine::execute_multiplication;
+    table[std::to_underlying(Instruction::OP_MATMUL)] = &VirtualMachine::execute_matmul;
     table[std::to_underlying(Instruction::OP_DIV)] = &VirtualMachine::execute_division;
 
     table[std::to_underlying(Instruction::OP_DEFINE_VARIABLE)] = &VirtualMachine::execute_define_global_variable;
@@ -194,34 +195,37 @@ inline VirtualMachineResult VirtualMachine::execute_multiplication() {
         [&](const float &first_operand, const float &second_operand) {
             push(first_operand * second_operand);
             return VirtualMachineResult::OK;
-        },
-        [&](const TensorPtr &first_tensor, const TensorPtr &second_tensor) {
-            const auto M = first_tensor->tensor_shape[0];
-            const auto N = second_tensor->tensor_shape[1];
-            const auto K = first_tensor->tensor_shape[1];
-
-            if (first_tensor->tensor_shape[1] != second_tensor->tensor_shape[0]) {
-                report_error("tensor dimension mismatch");
-                return VirtualMachineResult::RUNTIME_ERROR;
-            }
-
-            if (first_tensor->data_type != second_tensor->data_type) {
-                report_error("impossible to multiply tensors of different element types");
-                return VirtualMachineResult::RUNTIME_ERROR;
-            }
-
-            const auto resulting_tensor = std::make_shared<TensorStructure>();
-            resulting_tensor->tensor_shape = {M, N};
-            resulting_tensor->set_strides();
-            resulting_tensor->data_type = first_tensor->data_type;
-            resulting_tensor->buffer = metal_engine.dispatch_matmul(
-                first_tensor->buffer, second_tensor->buffer, M, N, K, first_tensor->data_type
-            );
-
-            push(resulting_tensor);
-            return VirtualMachineResult::OK;
         }
     );
+}
+
+inline VirtualMachineResult VirtualMachine::execute_matmul() {
+    return execute_operation("@", [&](const TensorPtr &first_tensor, const TensorPtr &second_tensor) {
+        const auto M = first_tensor->tensor_shape[0];
+        const auto N = second_tensor->tensor_shape[1];
+        const auto K = first_tensor->tensor_shape[1];
+
+        if (first_tensor->tensor_shape[1] != second_tensor->tensor_shape[0]) {
+            report_error("tensor dimension mismatch");
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+
+        if (first_tensor->data_type != second_tensor->data_type) {
+            report_error("impossible to multiply tensors of different element types");
+            return VirtualMachineResult::RUNTIME_ERROR;
+        }
+
+        const auto resulting_tensor = std::make_shared<TensorStructure>();
+        resulting_tensor->tensor_shape = {M, N};
+        resulting_tensor->set_strides();
+        resulting_tensor->data_type = first_tensor->data_type;
+        resulting_tensor->buffer = metal_engine.dispatch_matmul(
+            first_tensor->buffer, second_tensor->buffer, M, N, K, first_tensor->data_type
+        );
+
+        push(resulting_tensor);
+        return VirtualMachineResult::OK;
+    });
 }
 
 inline VirtualMachineResult VirtualMachine::execute_division() {

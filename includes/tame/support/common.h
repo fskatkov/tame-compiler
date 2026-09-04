@@ -50,6 +50,7 @@ enum class Instruction : std::uint8_t {
 
     OP_ADD, OP_SUB,
     OP_MUL, OP_DIV,
+    OP_MATMUL,
 
     OP_DEFINE_VARIABLE, OP_BUILD_TENSOR,
     OP_GET_LOCAL, OP_SET_LOCAL,
